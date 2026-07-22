@@ -1,33 +1,156 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { MobileFrame } from '../../components/MobileFrame';
-import { ChevronLeft, CheckCircle, Scale, Banknote, MapPin, RefreshCw, Share2, Award, ShieldAlert, Cpu } from 'lucide-react';
+import { ChevronLeft, CheckCircle, Scale, Banknote, MapPin, RefreshCw, Share2, Award, ShieldAlert, Cpu, Sparkles, Droplets, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const GREEN = '#2ECC71';
 const CHARCOAL = '#2C3E50';
 const ORANGE = '#E67E22';
 
+// Multiple items detected — multi-bounding box simulation
 const ANALYSIS_RESULTS = [
-  { type: 'Bouteille plastique PET', recyclable: true, price: 300, weight: 10, confidence: 96, category: 'Plastique', emoji: '🧴' },
-  { type: 'Carton brun', recyclable: true, price: 150, weight: 8, confidence: 92, category: 'Carton', emoji: '📦' },
-  { type: 'Canette aluminium', recyclable: true, price: 450, weight: 5, confidence: 98, category: 'Métal', emoji: '🥫' },
+  { type: 'Bouteille plastique PET', recyclable: true, price: 300, weight: 10, confidence: 96, category: 'Plastique', emoji: '🧴', materialCode: 'PET-1', co2: 15.6 },
+  { type: 'Carton brun', recyclable: true, price: 150, weight: 8, confidence: 92, category: 'Carton', emoji: '📦', materialCode: 'CARD-2', co2: 8.2 },
+  { type: 'Canette aluminium', recyclable: true, price: 450, weight: 5, confidence: 98, category: 'Métal', emoji: '🥫', materialCode: 'ALU-3', co2: 22.1 },
 ];
+
+// Pricing breakdown detail
+const PRICING_BREAKDOWN = [
+  { label: 'Prix de base (plastique PET)', value: 250, unit: 'FCFA' },
+  { label: 'Bonus Qualité A+ (propreté)', value: 50, unit: 'FCFA', positive: true },
+  { label: 'Prime poids > 5 kg', value: 25, unit: 'FCFA', positive: true },
+  { label: 'Frais de traitement', value: -25, unit: 'FCFA', positive: false },
+];
+
+// Animated counter hook
+function useAnimatedCounter(target: number, duration = 1200) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (target === 0) return;
+    const startTime = performance.now();
+    let raf: number;
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * target));
+
+      if (progress < 1) {
+        raf = requestAnimationFrame(animate);
+      }
+    };
+
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+
+  return count;
+}
+
+function AnimatedMetric({ value, label, icon: Icon, color, suffix }: {
+  value: number;
+  label: string;
+  icon: any;
+  color: string;
+  suffix?: string;
+}) {
+  const animatedValue = useAnimatedCounter(value);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 120, damping: 14 }}
+      className="flex flex-col items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl"
+    >
+      <Icon size={20} color={color} />
+      <span className="text-xl font-black mt-1.5" style={{ color: CHARCOAL }}>
+        {animatedValue}{suffix || ''}
+      </span>
+      <span className="text-[9px] font-bold text-slate-400 uppercase">{label}</span>
+    </motion.div>
+  );
+}
+
+function PricingBar({ label, value, unit, maxValue, positive }: {
+  label: string;
+  value: number;
+  unit: string;
+  maxValue: number;
+  positive: boolean;
+}) {
+  const absValue = Math.abs(value);
+  const barWidth = (absValue / maxValue) * 100;
+  const animatedWidth = useAnimatedCounter(barWidth);
+
+  return (
+    <div className="flex flex-col gap-1 py-1.5">
+      <div className="flex justify-between items-center">
+        <span className="text-[11px] text-slate-500 font-semibold">{label}</span>
+        <span className={`text-xs font-black ${positive ? 'text-emerald-500' : 'text-red-500'}`}>
+          {positive ? '+' : '-'}{absValue} {unit}
+        </span>
+      </div>
+      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${animatedWidth}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+          className="h-full rounded-full"
+          style={{ background: positive ? GREEN : '#ef4444' }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function Analyse() {
   const navigate = useNavigate();
-  const [result] = useState(ANALYSIS_RESULTS[0]);
+  const [results] = useState(ANALYSIS_RESULTS);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [analyzing, setAnalyzing] = useState(true);
+  const [scanProgress, setScanProgress] = useState(0);
+
+  const result = results[selectedIndex];
 
   useEffect(() => {
-    const timer = setTimeout(() => setAnalyzing(false), 2000);
-    return () => clearTimeout(timer);
+    // Progressive scan simulation
+    const timer = setTimeout(() => {
+      setAnalyzing(false);
+      setScanProgress(100);
+    }, 2200);
+
+    // Scan progress ticker
+    const progressInterval = setInterval(() => {
+      setScanProgress(prev => {
+        if (prev >= 95) return prev;
+        return prev + Math.floor(Math.random() * 8) + 2;
+      });
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(progressInterval);
+    };
   }, []);
 
-  const handleRetry = () => {
+  const handleRetry = useCallback(() => {
     setAnalyzing(true);
-    setTimeout(() => setAnalyzing(false), 1800);
-  };
+    setScanProgress(0);
+    setTimeout(() => setAnalyzing(false), 2000);
+    const pi = setInterval(() => {
+      setScanProgress(prev => {
+        if (prev >= 95) { clearInterval(pi); return prev; }
+        return prev + Math.floor(Math.random() * 8) + 2;
+      });
+    }, 200);
+  }, []);
+
+  const maxPricingValue = Math.max(...PRICING_BREAKDOWN.map(p => Math.abs(p.value)));
 
   return (
     <MobileFrame bgColor="#F8F9F9">
@@ -35,18 +158,18 @@ export default function Analyse() {
         {/* Navigation Header */}
         <div style={{ background: '#fff', padding: '16px 20px', borderBottom: '1px solid #f0f0f0' }}>
           <div className="flex items-center justify-between">
-            <motion.button 
+            <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={() => navigate('/citizen/camera')} 
-              className="flex items-center justify-center border-none cursor-pointer rounded-xl bg-slate-100" 
+              onClick={() => navigate('/citizen/camera')}
+              className="flex items-center justify-center border-none cursor-pointer rounded-xl bg-slate-100"
               style={{ width: 38, height: 38 }}
             >
               <ChevronLeft size={20} color={CHARCOAL} />
             </motion.button>
             <span className="text-base font-extrabold" style={{ color: CHARCOAL }}>Analyse IA en direct</span>
-            <motion.button 
+            <motion.button
               whileTap={{ scale: 0.9 }}
-              className="flex items-center justify-center border-none cursor-pointer rounded-xl bg-slate-100" 
+              className="flex items-center justify-center border-none cursor-pointer rounded-xl bg-slate-100"
               style={{ width: 38, height: 38 }}
             >
               <Share2 size={16} color={CHARCOAL} />
@@ -54,70 +177,124 @@ export default function Analyse() {
           </div>
         </div>
 
-        <div className="flex flex-col px-5 pt-5 gap-4 flex-1">
-          
-          {/* AI Viewfinder Preview Box */}
-          <div 
-            className="relative rounded-3xl overflow-hidden shadow-sm flex items-center justify-center" 
-            style={{ 
-              height: 220, 
-              background: 'linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%)', 
+        <div className="flex flex-col px-5 pt-5 gap-4 flex-1 overflow-y-auto">
+          {/* AI Viewfinder Preview Box — Enhanced */}
+          <div
+            className="relative rounded-3xl overflow-hidden shadow-sm flex items-center justify-center"
+            style={{
+              height: 240,
+              background: 'linear-gradient(135deg, #0a1628 0%, #1a2a4a 50%, #0d1f3c 100%)',
             }}
           >
+            {/* Subtle grid overlay */}
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{ backgroundImage: 'linear-gradient(rgba(52,211,153,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.3) 1px, transparent 1px)', backgroundSize: '30px 30px' }}
+            />
+
             {/* Visual element emoji */}
-            <motion.span 
+            <motion.span
               initial={{ scale: 0.8 }}
-              animate={analyzing ? { scale: [1, 1.05, 1] } : { scale: 1.15 }}
-              transition={{ repeat: analyzing ? Infinity : 0, duration: 1.5 }}
-              style={{ fontSize: 90 }}
+              animate={analyzing ? { scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] } : { scale: 1.15, rotate: 0 }}
+              transition={{ repeat: analyzing ? Infinity : 0, duration: 2 }}
+              style={{ fontSize: 80, filter: analyzing ? 'grayscale(0.5)' : 'none' }}
             >
               {result.emoji}
             </motion.span>
 
-            {/* Bounding box simulation when scanning */}
+            {/* Enhanced Bounding boxes — Multi-detect simulation */}
             <AnimatePresence>
               {analyzing ? (
                 <>
-                  {/* Bounding bracket lines */}
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                  {/* Bounding bracket line — Main object */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute border border-dashed border-emerald-400"
-                    style={{ width: 140, height: 140, borderRadius: 12 }}
+                    className="absolute border-2"
+                    style={{
+                      width: 160, height: 160, borderRadius: 12,
+                      borderColor: 'rgba(52,211,153,0.6)',
+                      boxShadow: '0 0 20px rgba(52,211,153,0.15), inset 0 0 20px rgba(52,211,153,0.05)',
+                      top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                    }}
                   />
-                  {/* Glowing vertical laser scan line */}
-                  <motion.div 
-                    animate={{ top: [20, 180, 20] }}
-                    transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                    className="absolute left-10 right-10 h-0.5 bg-emerald-400 shadow-[0_0_8px_#34d399] pointer-events-none"
+                  {/* Secondary bounding box */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.7, 0.3, 0.7] }}
+                    exit={{ opacity: 0 }}
+                    transition={{ repeat: Infinity, duration: 3 }}
+                    className="absolute border border-cyan-400/40"
+                    style={{
+                      width: 70, height: 90, borderRadius: 8,
+                      top: '20%', right: '18%',
+                    }}
+                  />
+                  {/* Tertiary bounding box */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.5, 0.2, 0.5] }}
+                    exit={{ opacity: 0 }}
+                    transition={{ repeat: Infinity, duration: 2.5, delay: 0.5 }}
+                    className="absolute border border-amber-400/30"
+                    style={{
+                      width: 55, height: 65, borderRadius: 8,
+                      bottom: '25%', left: '15%',
+                    }}
+                  />
+                  {/* Enhanced glowing vertical laser scan line */}
+                  <motion.div
+                    animate={{ top: [20, 200, 20] }}
+                    transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
+                    className="absolute left-8 right-8 h-0.5 pointer-events-none"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, #34d399 50%, transparent 100%)',
+                      boxShadow: '0 0 12px #34d399, 0 0 24px rgba(52,211,153,0.3)',
+                    }}
                   />
                   {/* Float text details */}
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="absolute bottom-4 left-4 bg-emerald-500 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-sm"
+                    className="absolute bottom-4 left-3 flex gap-2"
                   >
-                    SCANNING: RAW_OBJECT
+                    <div className="bg-emerald-500/90 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-sm backdrop-blur-sm border border-emerald-400/30">
+                      SCANNING: {result.materialCode}
+                    </div>
+                    <div className="bg-slate-900/80 text-white font-mono text-[9px] px-2 py-0.5 rounded shadow-sm border border-white/10">
+                      {scanProgress}%
+                    </div>
                   </motion.div>
                 </>
               ) : (
-                /* Static detected labels after analysis */
-                <motion.div 
+                /* Static detected labels after analysis — Enhanced */
+                <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4"
                 >
                   <div className="flex justify-between items-start">
-                    <div className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg shadow-sm">
-                      PET_PLASTIC ✔️
+                    <div className="flex gap-2">
+                      <div className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1">
+                        <CheckCircle size={12} /> {result.materialCode}
+                      </div>
+                      <div className="bg-amber-500/80 text-white text-[10px] font-bold px-2 py-1 rounded-lg">
+                        ★ Qualité A+
+                      </div>
                     </div>
-                    <div className="bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/10">
-                      IA: {result.confidence}%
+                    <div className="bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1">
+                      <Cpu size={11} /> {result.confidence}%
                     </div>
                   </div>
-                  <div className="bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-mono px-3 py-1.5 rounded-lg border border-white/5 self-start">
-                    OBJECT_CLASS_091: RECYCLABLE
+                  {/* Material composition badges */}
+                  <div className="flex gap-1.5 self-start">
+                    <div className="bg-emerald-900/70 backdrop-blur-md text-emerald-300 text-[9px] font-mono px-2 py-1 rounded-lg border border-emerald-500/20">
+                      ♻️ RECYCLABLE
+                    </div>
+                    <div className="bg-blue-900/70 backdrop-blur-md text-blue-300 text-[9px] font-mono px-2 py-1 rounded-lg border border-blue-500/20">
+                      🌱 BIO {result.weight * 1.8}kg CO2
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -126,7 +303,7 @@ export default function Analyse() {
             {/* Analysis State Modal cover */}
             <AnimatePresence>
               {analyzing && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -134,11 +311,26 @@ export default function Analyse() {
                 >
                   <div className="text-center">
                     <div className="relative inline-flex items-center justify-center mb-3">
-                      <div className="w-12 h-12 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                      <Cpu size={18} className="absolute text-emerald-400 animate-pulse" />
+                      <div className="w-14 h-14 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                      <Cpu size={22} className="absolute text-emerald-400 animate-pulse" />
                     </div>
                     <p className="text-sm font-black text-white tracking-wide uppercase">Analyse IA en cours...</p>
-                    <p className="text-[10px] text-slate-300 mt-0.5">Classification des polymères...</p>
+                    <p className="text-[10px] text-slate-300 mt-1">Classification des polymères...</p>
+
+                    {/* Progress bar */}
+                    <div className="w-48 mt-3 mx-auto">
+                      <div className="flex justify-between text-[9px] text-slate-400 mb-1">
+                        <span>Scan</span>
+                        <span>{scanProgress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                        <motion.div
+                          className="h-full rounded-full bg-emerald-400"
+                          animate={{ width: `${scanProgress}%` }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -147,11 +339,31 @@ export default function Analyse() {
 
           <AnimatePresence mode="wait">
             {!analyzing && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col gap-4"
               >
+                {/* Material selector tabs */}
+                <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                  {results.map((r, idx) => (
+                    <motion.button
+                      key={idx}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSelectedIndex(idx)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border cursor-pointer text-xs font-bold whitespace-nowrap transition-all ${
+                        idx === selectedIndex ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <span>{r.emoji}</span>
+                      <span>{r.type.split(' ')[0]}</span>
+                      <span className={`text-[9px] ${idx === selectedIndex ? 'text-emerald-100' : 'text-slate-400'}`}>
+                        {r.price} FCFA
+                      </span>
+                    </motion.button>
+                  ))}
+                </div>
+
                 {/* Result Info Card */}
                 <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
                   <div className="flex items-start justify-between mb-4">
@@ -159,63 +371,117 @@ export default function Analyse() {
                       <p className="text-[10px] text-emerald-500 font-extrabold uppercase tracking-widest">{result.category}</p>
                       <h2 className="text-xl font-black mt-1" style={{ color: CHARCOAL }}>{result.type}</h2>
                     </div>
-                    
-                    <div className="flex items-center gap-1 bg-emerald-500/10 px-3 py-1 rounded-xl">
+
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
+                      className="flex items-center gap-1 bg-emerald-500/10 px-3 py-1 rounded-xl"
+                    >
                       <CheckCircle size={14} color={GREEN} />
                       <span className="text-xs font-black text-emerald-600">Recyclable</span>
-                    </div>
+                    </motion.div>
                   </div>
 
-                  {/* Highlighted metrics widgets */}
+                  {/* Highlighted metrics widgets — Animated */}
                   <div className="grid grid-cols-3 gap-2.5">
-                    <div className="flex flex-col items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                      <Banknote size={20} color={ORANGE} />
-                      <span className="text-xl font-black mt-1.5" style={{ color: CHARCOAL }}>{result.price}</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">FCFA Estimés</span>
-                    </div>
-                    <div className="flex flex-col items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                      <Scale size={20} color={GREEN} />
-                      <span className="text-xl font-black mt-1.5" style={{ color: CHARCOAL }}>{result.weight}</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Kg Estimés</span>
-                    </div>
-                    <div className="flex flex-col items-center p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                      <Award size={20} color="#9b59b6" />
-                      <span className="text-xl font-black mt-1.5" style={{ color: CHARCOAL }}>A+</span>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">Qualité</span>
-                    </div>
+                    <AnimatedMetric
+                      value={result.price}
+                      label="FCFA Estimés"
+                      icon={Banknote}
+                      color={ORANGE}
+                    />
+                    <AnimatedMetric
+                      value={result.weight}
+                      label="Kg Estimés"
+                      icon={Scale}
+                      color={GREEN}
+                      suffix=" kg"
+                    />
+                    <AnimatedMetric
+                      value={result.confidence}
+                      label="Confiance"
+                      icon={Award}
+                      color="#9b59b6"
+                      suffix="%"
+                    />
                   </div>
                 </div>
 
-                {/* Eco-Impact badge */}
-                <div 
-                  className="rounded-2xl p-4 border flex items-center gap-3 bg-emerald-500/5 border-emerald-500/10"
+                {/* Eco-Impact badge — Enhanced */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.15 }}
+                  className="rounded-2xl p-4 border flex items-center gap-3 bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 border-emerald-500/10"
                 >
-                  <span className="text-xl">🌱</span>
-                  <div>
+                  <motion.span
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+                    className="text-xl"
+                  >
+                    🌱
+                  </motion.span>
+                  <div className="flex-1">
                     <p className="text-xs font-extrabold text-slate-800">Impact Écologique</p>
                     <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
-                      Cette collecte évite environ <b>15.6 kg</b> d'émissions de CO2. Merci !
+                      Cette collecte évite environ <b>{result.co2} kg</b> d'émissions de CO2.
                     </p>
+                  </div>
+                  <div className="flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded-lg">
+                    <Sparkles size={12} color={GREEN} />
+                    <span className="text-[9px] font-black text-emerald-600">Éco+</span>
+                  </div>
+                </motion.div>
+
+                {/* Detailed pricing breakdown — Enhanced with animated bars */}
+                <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-3">Estimation du tarif</span>
+
+                  <div className="flex flex-col gap-1">
+                    {PRICING_BREAKDOWN.map((row, idx) => (
+                      <PricingBar
+                        key={idx}
+                        label={row.label}
+                        value={row.value}
+                        unit={row.unit}
+                        maxValue={maxPricingValue}
+                        positive={row.positive}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="flex justify-between items-center pt-3 mt-2 border-t border-slate-100">
+                    <span className="text-xs font-black text-slate-800">Valeur totale estimée</span>
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 150, delay: 0.6 }}
+                      className="text-base font-black text-orange-500"
+                    >
+                      {result.price} FCFA
+                    </motion.span>
                   </div>
                 </div>
 
-                {/* Detailed pricing breakdown */}
+                {/* Material Composition Details */}
                 <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
-                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-3">Estimation du tarif</span>
-                  
-                  <div className="flex flex-col gap-2">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-3">Composition du matériau</span>
+                  <div className="flex gap-3">
                     {[
-                      { label: 'Prix de base (plastique PET)', value: `${result.price - 50} FCFA` },
-                      { label: 'Bonus Qualité A+ (propreté)', value: '+50 FCFA', positive: true },
-                      { label: 'Valeur totale estimée', value: `${result.price} FCFA`, bold: true },
-                    ].map((row, idx) => (
-                      <div 
-                        key={idx} 
-                        className="flex justify-between items-center py-1.5" 
-                        style={{ borderBottom: row.bold ? 'none' : '1px solid #f8f9fa' }}
-                      >
-                        <span className={`text-xs ${row.bold ? 'font-black text-slate-800' : 'text-slate-500'}`}>{row.label}</span>
-                        <span className={`text-xs font-black ${row.positive ? 'text-emerald-500' : row.bold ? 'text-orange-500 text-sm' : 'text-slate-800'}`}>{row.value}</span>
+                      { label: 'Polymère', value: 'PET-1', color: '#3498db' },
+                      { label: 'Densité', value: '0.38 g/cm³', color: GREEN },
+                      { label: 'Humidité', value: '2.1%', color: ORANGE },
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex-1 flex flex-col items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex items-center gap-1 mb-1">
+                          {idx === 0 && <Droplets size={12} color={item.color} />}
+                          {idx === 1 && <Scale size={12} color={item.color} />}
+                          {idx === 2 && <Trash2 size={12} color={item.color} />}
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">{item.label}</span>
+                        </div>
+                        <span className="text-sm font-black" style={{ color: item.color }}>{item.value}</span>
                       </div>
                     ))}
                   </div>
@@ -231,7 +497,7 @@ export default function Analyse() {
                     <RefreshCw size={16} color={CHARCOAL} />
                     <span className="text-xs font-bold text-slate-700">Réessayer</span>
                   </motion.button>
-                  
+
                   <motion.button
                     whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(230,126,34,0.3)' }}
                     whileTap={{ scale: 0.95 }}
@@ -251,3 +517,4 @@ export default function Analyse() {
     </MobileFrame>
   );
 }
+
