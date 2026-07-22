@@ -1,22 +1,75 @@
+/**
+ * Connexion — RecyGo CI
+ *
+ * Écran de connexion avec :
+ * - Bandeau supérieur vert foncé dégradé (~25% hauteur), arrondi en bas
+ *   - Icône recyclage blanche + "RecyGo CI" (13px)
+ *   - Titre "Bon retour ! 👋" blanc (24px, gras)
+ *   - Sous-titre "Connectez-vous pour continuer" vert clair (13px)
+ * - Formulaire sur fond blanc :
+ *   - Label "E-MAIL OU TÉLÉPHONE" (11px, majuscules, gris)
+ *   - Input arrondi (radius 12px), bordure grise fine, placeholder
+ *   - Label "MOT DE PASSE"
+ *   - Input avec icône cadenas, œil toggle, placeholder masqué
+ *   - Lien "Mot de passe oublié ?" vert aligné droite (12px)
+ *   - Bouton plein largeur vert (#2ECC71), pill, "Se connecter" (52px)
+ *   - Séparateur "ou" avec lignes
+ *   - Bouton "Continuer avec Google" (bordure grise, fond blanc)
+ *   - Footer: "Pas encore de compte ? S'inscrire" (lien vert)
+ */
+
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { View, Text, TextInput, Pressable, StyleSheet, Animated as RNAnimated, ActivityIndicator, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Animated as RNAnimated,
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp, Role } from '@/context/AppContext';
 import { MobileFrame } from '@/components/MobileFrame';
 
-const GREEN = '#2ECC71';
-const CHARCOAL = '#2C3E50';
-const ORANGE = '#E67E22';
+// ─── Constantes de design ───────────────────────────────────────────
+const GREEN_DARK = '#0F5C34';
+const GREEN_MID = '#1E7A46';
+const GREEN_CTA = '#2ECC71';
+const GREEN_LIGHT = '#2ECC71';
+const WHITE = '#FFFFFF';
+const TEXT_DARK = '#1A1A1A';
+const TEXT_GRAY = '#6B7280';
+const BORDER_GRAY = '#D1D5DB';
+const INPUT_BG = '#F9FAFB';
 
-function AnimatedView({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: any }) {
+// ─── Composant d'animation ──────────────────────────────────────────
+function AnimatedView({
+  children,
+  delay = 0,
+  style,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  style?: any;
+}) {
   const opacity = useRef(new RNAnimated.Value(0)).current;
-  const translateY = useRef(new RNAnimated.Value(30)).current;
+  const translateY = useRef(new RNAnimated.Value(24)).current;
 
   useEffect(() => {
     RNAnimated.parallel([
       RNAnimated.timing(opacity, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
-      RNAnimated.spring(translateY, { toValue: 0, friction: 8, tension: 60, delay, useNativeDriver: true }),
+      RNAnimated.spring(translateY, {
+        toValue: 0,
+        friction: 8,
+        tension: 60,
+        delay,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
@@ -27,351 +80,441 @@ function AnimatedView({ children, delay = 0, style }: { children: React.ReactNod
   );
 }
 
-function ShakeView({ children, triggerKey, style }: { children: React.ReactNode; triggerKey: number; style?: any }) {
-  const shakeAnim = useRef(new RNAnimated.Value(0)).current;
-
-  useEffect(() => {
-    if (triggerKey > 0) {
-      RNAnimated.sequence([
-        RNAnimated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: -5, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 5, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [triggerKey]);
-
-  return (
-    <RNAnimated.View style={[{ transform: [{ translateX: shakeAnim }] }, style]}>
-      {children}
-    </RNAnimated.View>
-  );
-}
-
+// ─── Écran de connexion ─────────────────────────────────────────────
 export default function Login() {
   const router = useRouter();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
   const { login, setRole } = useApp();
-  const role = (roleParam || 'citizen') as Role;
   const insets = useSafeAreaInsets();
 
-  const [phone, setPhone] = useState('');
-  const [error, setError] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
+  // États
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorKey, setErrorKey] = useState(0);
+  const [error, setError] = useState('');
 
-  const accent = role === 'citizen' ? GREEN : CHARCOAL;
-
-  const handleLogin = () => {
-    if (!phone.trim() || phone.length < 10) {
-      setError('Numéro de téléphone invalide (10 chiffres requis)');
-      setErrorKey(prev => prev + 1);
+  // ── Connexion mock ────────────────────────────────────────────────
+  const handleLogin = async () => {
+    if (!identifier.trim()) {
+      setError('Veuillez entrer votre e-mail ou téléphone');
       return;
     }
+    if (!password.trim()) {
+      setError('Veuillez entrer votre mot de passe');
+      return;
+    }
+
     setError('');
     setIsLoading(true);
 
+    // Simule une latence réseau
     setTimeout(() => {
-      setIsLoading(false);
-      const user = {
-        name: role === 'citizen' ? 'Koné Moussa' : "Recycleur Côte d'Ivoire",
-        phone: `+225 ${phone}`,
+      const role = (roleParam as Role) || 'citizen';
+      const mockUser = {
+        name: role === 'citizen' ? 'Aya Kouassi' : "Recycleur Pro Côte d'Ivoire",
+        phone: identifier,
         role,
       };
-      login(user);
+      login(mockUser);
       setRole(role);
-      router.replace(('/(tabs)/home') as any);
+      setIsLoading(false);
+      router.replace('/(tabs)/home');
     }, 1200);
   };
 
   return (
-    <MobileFrame bgColor="#F8F9F9">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
         keyboardShouldPersistTaps="handled"
+        bounces={false}
       >
-        {/* Back Button */}
-        <AnimatedView delay={0}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backIcon}>←</Text>
-            <Text style={styles.backText}>Retour</Text>
-          </Pressable>
-        </AnimatedView>
+        {/* ─── Bandeau supérieur ───────────────────────────────────── */}
+        <View style={styles.header}>
+          {/* Dégradé */}
+          <View style={styles.headerGradient} />
 
-        {/* Header */}
-        <AnimatedView delay={100} style={styles.headerWrapper}>
-          <View style={styles.headerSection}>
-            <View style={[styles.headerIcon, { backgroundColor: accent, shadowColor: accent }]}>
-              <Text style={styles.headerIconText}>♻️</Text>
+          <AnimatedView delay={0} style={styles.headerTopRow}>
+            <View style={styles.headerBrandRow}>
+              <Text style={styles.headerBrandIcon}>♻️</Text>
+              <Text style={styles.headerBrandName}>RecyGo CI</Text>
             </View>
-            <Text style={styles.headerTitle}>Connexion</Text>
-            <View style={[styles.rolePill, { backgroundColor: `${accent}15` }]}>
-              <Text style={[styles.rolePillText, { color: accent }]}>
-                {role === 'citizen' ? '🌿 Espace Citoyen' : '🏭 Espace Recycleur Pro'}
-              </Text>
-            </View>
-          </View>
-        </AnimatedView>
+          </AnimatedView>
 
-        {/* Phone Input */}
-        <AnimatedView delay={200}>
-          <View>
-            <Text style={styles.label}>📞 Ton Numéro de Téléphone</Text>
-            <View
-              style={[
-                styles.phoneContainer,
+          <AnimatedView delay={100} style={styles.headerTextSection}>
+            <Text style={styles.headerTitle}>Bon retour ! 👋</Text>
+            <Text style={styles.headerSubtitle}>
+              Connectez-vous pour continuer
+            </Text>
+          </AnimatedView>
+        </View>
+
+        {/* ─── Formulaire ──────────────────────────────────────────── */}
+        <View style={styles.formContainer}>
+          {/* Champ E-mail ou Téléphone */}
+          <AnimatedView delay={150}>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>E-MAIL OU TÉLÉPHONE</Text>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputIcon}>📧</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="aya.kouassi@example.com"
+                  placeholderTextColor="#9CA3AF"
+                  value={identifier}
+                  onChangeText={setIdentifier}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!isLoading}
+                />
+              </View>
+            </View>
+          </AnimatedView>
+
+          {/* Champ Mot de passe */}
+          <AnimatedView delay={200}>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>MOT DE PASSE</Text>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputIcon}>🔒</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor="#9CA3AF"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!isLoading}
+                />
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeButton}
+                >
+                  <Text style={styles.eyeIcon}>
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </AnimatedView>
+
+          {/* Mot de passe oublié */}
+          <AnimatedView delay={250}>
+            <Pressable style={styles.forgotRow}>
+              <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+            </Pressable>
+          </AnimatedView>
+
+          {/* Message d'erreur */}
+          {error ? (
+            <AnimatedView delay={100}>
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              </View>
+            </AnimatedView>
+          ) : null}
+
+          {/* Bouton Se connecter */}
+          <AnimatedView delay={300}>
+            <Pressable
+              onPress={handleLogin}
+              disabled={isLoading}
+              style={({ pressed }) => [
+                styles.submitButton,
                 {
-                  borderColor: isFocused ? accent : phone.length === 10 ? '#34c759' : '#E8ECEF',
-                  shadowColor: isFocused ? accent : 'transparent',
-                  shadowOpacity: isFocused ? 0.1 : 0,
-                  shadowRadius: isFocused ? 20 : 0,
+                  opacity: isLoading ? 0.7 : pressed ? 0.9 : 1,
+                  transform: [{ scale: pressed && !isLoading ? 0.98 : 1 }],
                 },
               ]}
             >
-              <View
-                style={[
-                  styles.phonePrefix,
-                  {
-                    backgroundColor: isFocused ? `${accent}10` : '#F8F9FA',
-                    borderRightColor: isFocused ? accent : '#E8ECEF',
-                  },
-                ]}
-              >
-                <Text style={[styles.phonePrefixText, { color: isFocused ? accent : CHARCOAL }]}>📞</Text>
-                <Text style={[styles.phonePrefixCode, { color: isFocused ? accent : CHARCOAL }]}>+225</Text>
-              </View>
-              <TextInput
-                placeholder="07 00 00 00 00"
-                placeholderTextColor="#94A3B8"
-                value={phone}
-                onChangeText={(val) => setPhone(val.replace(/\D/g, ''))}
-                maxLength={10}
-                keyboardType="phone-pad"
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                editable={!isLoading}
-                style={styles.phoneInput}
-              />
-            </View>
-          </View>
-        </AnimatedView>
-
-        {/* Error Alert with Shake */}
-        {error ? (
-          <ShakeView triggerKey={errorKey} style={styles.errorContainer}>
-            <Text style={styles.errorIcon}>⚠️</Text>
-            <Text style={styles.errorText}>{error}</Text>
-          </ShakeView>
-        ) : null}
-
-        {/* Submit CTA */}
-        <AnimatedView delay={300}>
-          <Pressable
-            onPress={handleLogin}
-            disabled={isLoading}
-            style={({ pressed }) => [
-              styles.submitButton,
-              {
-                opacity: isLoading ? 0.8 : 1,
-                transform: [{ scale: pressed && !isLoading ? 0.98 : 1 }],
-              },
-            ]}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
+              {isLoading ? (
+                <ActivityIndicator size="small" color={WHITE} />
+              ) : (
                 <Text style={styles.submitText}>Se connecter</Text>
-                <Text style={styles.submitArrow}>→</Text>
-              </>
-            )}
-          </Pressable>
-        </AnimatedView>
-
-        {/* Separator */}
-        <AnimatedView delay={400} style={styles.separator}>
-          <View style={styles.separatorLine} />
-          <Text style={styles.separatorText}>ou</Text>
-          <View style={styles.separatorLine} />
-        </AnimatedView>
-
-        {/* Register Link */}
-        <AnimatedView delay={500}>
-          <View style={styles.registerSection}>
-            <Text style={styles.registerText}>Nouveau sur RecyGo ?</Text>
-            <Pressable onPress={() => router.push(`/(auth)/register?role=${role}` as any)}>
-              <Text style={[styles.registerLink, { color: accent }]}>
-                Créer un compte gratuitement
-              </Text>
+              )}
             </Pressable>
-          </View>
-        </AnimatedView>
+          </AnimatedView>
 
-        {/* Switch Profile Space */}
-        <AnimatedView delay={600} style={styles.switchSection}>
-          <View style={styles.switchCard}>
-            <Text style={styles.switchLabel}>
-              {role === 'citizen' ? 'Recycleur Professionnel ?' : 'Simple Citoyen ?'}
-            </Text>
+          {/* Séparateur */}
+          <AnimatedView delay={350}>
+            <View style={styles.separatorRow}>
+              <View style={styles.separatorLine} />
+              <Text style={styles.separatorText}>ou</Text>
+              <View style={styles.separatorLine} />
+            </View>
+          </AnimatedView>
+
+          {/* Bouton Google */}
+          <AnimatedView delay={400}>
             <Pressable
-              onPress={() => {
-                const nextRole = role === 'citizen' ? 'pro' : 'citizen';
-                router.push(`/(auth)/login?role=${nextRole}` as any);
-              }}
+              style={({ pressed }) => [
+                styles.googleButton,
+                { opacity: pressed ? 0.9 : 1 },
+              ]}
             >
-              <Text style={{ fontSize: 13, fontWeight: '900', marginTop: 4, color: role === 'citizen' ? CHARCOAL : GREEN }}>
-                Basculer vers l'espace {role === 'citizen' ? 'Pro' : 'Citoyen'} →
-              </Text>
+              <Text style={styles.googleIcon}>G</Text>
+              <Text style={styles.googleText}>Continuer avec Google</Text>
             </Pressable>
-          </View>
-        </AnimatedView>
+          </AnimatedView>
+
+          {/* Footer : inscription */}
+          <AnimatedView delay={450}>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>Pas encore de compte ? </Text>
+              <Pressable
+                onPress={() =>
+                  router.push(
+                    `/(auth)/register?role=${roleParam || 'citizen'}`
+                  )
+                }
+              >
+                <Text style={styles.footerLink}>S'inscrire</Text>
+              </Pressable>
+            </View>
+          </AnimatedView>
+
+          {/* Espace de sécurité */}
+          <View style={{ height: 40 }} />
+        </View>
       </ScrollView>
-    </MobileFrame>
+    </KeyboardAvoidingView>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  scrollView: { flex: 1 },
-  scrollContent: { paddingHorizontal: 24, paddingBottom: 32, minHeight: 760 },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 24,
-    alignSelf: 'flex-start',
+  container: {
+    flex: 1,
+    backgroundColor: WHITE,
   },
-  backIcon: { fontSize: 20, color: '#64748B' },
-  backText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
-  headerWrapper: { alignSelf: 'stretch' },
-  headerSection: { alignItems: 'center', marginBottom: 32 },
-  headerIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 6,
+  scroll: {
+    flex: 1,
   },
-  headerIconText: { fontSize: 34 },
-  headerTitle: { fontSize: 24, fontWeight: '900', color: CHARCOAL, textAlign: 'center' },
-  rolePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginTop: 6,
+  scrollContent: {
+    flexGrow: 1,
   },
-  rolePillText: { fontSize: 11, fontWeight: '800' },
-  label: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#475569',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  phoneContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 2,
+
+  // ── Bandeau supérieur ──
+  header: {
+    height: 260,
+    backgroundColor: GREEN_MID,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     overflow: 'hidden',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    justifyContent: 'flex-start',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  phonePrefix: {
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: GREEN_DARK,
+    opacity: 0.25,
+  },
+  headerTopRow: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerBrandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRightWidth: 2,
   },
-  phonePrefixText: { fontSize: 16 },
-  phonePrefixCode: { fontSize: 15, fontWeight: '900' },
-  phoneInput: {
+  headerBrandIcon: {
+    fontSize: 16,
+    color: WHITE,
+  },
+  headerBrandName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: WHITE,
+    opacity: 0.9,
+  },
+  headerTextSection: {
+    alignItems: 'center',
     flex: 1,
-    fontSize: 17,
-    fontWeight: '700',
-    color: CHARCOAL,
-    letterSpacing: 2,
-    paddingHorizontal: 12,
-    paddingVertical: 16,
+    justifyContent: 'center',
+    paddingBottom: 16,
   },
-  errorContainer: {
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: WHITE,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+  },
+
+  // ── Formulaire ──
+  formContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+  },
+  fieldGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: TEXT_GRAY,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: 16,
+    backgroundColor: INPUT_BG,
+    borderWidth: 1,
+    borderColor: BORDER_GRAY,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 50,
+  },
+  inputIcon: {
+    fontSize: 16,
+    marginRight: 10,
+    opacity: 0.6,
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: TEXT_DARK,
+    paddingVertical: 0,
+  },
+  eyeButton: {
+    padding: 6,
+  },
+  eyeIcon: {
+    fontSize: 16,
+    opacity: 0.6,
+  },
+
+  // ── Mot de passe oublié ──
+  forgotRow: {
+    alignItems: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: GREEN_CTA,
+  },
+
+  // ── Erreur ──
+  errorBox: {
     backgroundColor: '#FEF2F2',
-    borderRadius: 14,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#FECACA',
-    marginTop: 16,
   },
-  errorIcon: { fontSize: 16 },
-  errorText: { fontSize: 13, fontWeight: '700', color: '#DC2626', flex: 1 },
+  errorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+
+  // ── Bouton Se connecter ──
   submitButton: {
-    flexDirection: 'row',
+    width: '100%',
+    height: 52,
+    borderRadius: 999,
+    backgroundColor: GREEN_CTA,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    backgroundColor: ORANGE,
-    borderRadius: 20,
-    paddingVertical: 18,
     marginTop: 8,
-    shadowColor: ORANGE,
-    shadowOffset: { width: 0, height: 6 },
+    shadowColor: GREEN_CTA,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 18,
+    shadowRadius: 12,
     elevation: 6,
   },
   submitText: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: WHITE,
   },
-  submitArrow: { fontSize: 20, color: '#FFFFFF', fontWeight: '900' },
-  separator: {
+
+  // ── Séparateur ──
+  separatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
     marginVertical: 24,
+    gap: 12,
   },
-  separatorLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
-  separatorText: { fontSize: 11, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 },
-  registerSection: { alignItems: 'center', marginBottom: 24 },
-  registerText: { fontSize: 13, color: '#64748B' },
-  registerLink: { fontSize: 15, fontWeight: '900', marginTop: 4, textDecorationLine: 'underline' },
-  switchSection: { marginTop: 'auto' },
-  switchCard: {
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  separatorText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: TEXT_GRAY,
+  },
+
+  // ── Bouton Google ──
+  googleButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    height: 50,
+    borderRadius: 999,
+    backgroundColor: WHITE,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: BORDER_GRAY,
   },
-  switchLabel: {
-    fontSize: 11,
+  googleIcon: {
+    fontSize: 18,
     fontWeight: '800',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#4285F4',
+  },
+  googleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: TEXT_DARK,
+  },
+
+  // ── Footer ──
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 32,
+  },
+  footerText: {
+    fontSize: 13,
+    color: TEXT_GRAY,
+  },
+  footerLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: GREEN_CTA,
   },
 });
 

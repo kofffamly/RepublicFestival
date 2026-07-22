@@ -1,26 +1,65 @@
+/**
+ * Inscription — "Créer un compte" — RecyGo CI
+ *
+ * Écran d'inscription avec :
+ * - Bandeau supérieur vert foncé dégradé (~20% hauteur), arrondi en bas
+ *   - Flèche retour blanche en haut à gauche
+ *   - Titre "Créer un compte" blanc (22px, gras)
+ *   - Sous-titre "Rejoignez la communauté RecyGo CI" vert clair (13px)
+ * - Formulaire sur fond blanc :
+ *   - 4 champs avec label gris majuscule + icône à gauche :
+ *     1. "NOM COMPLET" — icône personne — placeholder "Aya Kouassi"
+ *     2. "TÉLÉPHONE" — icône téléphone — placeholder "+225 07 XX XX XX XX"
+ *     3. "E-MAIL" — icône enveloppe — placeholder "aya@example.com"
+ *     4. "MOT DE PASSE" — icône cadenas — placeholder masqué + œil toggle
+ *   - Bouton "Créer mon compte" vert (#2ECC71), pill, largeur complète
+ *   - Texte conditions : "En créant un compte, vous acceptez nos Conditions d'utilisation
+ *     et notre Politique de confidentialité" (liens en vert/gras)
+ */
+
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { View, Text, TextInput, Pressable, StyleSheet, Animated as RNAnimated, ActivityIndicator, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Animated as RNAnimated,
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp, Role } from '@/context/AppContext';
-import { MobileFrame } from '@/components/MobileFrame';
 
-const GREEN = '#2ECC71';
-const CHARCOAL = '#2C3E50';
-const ORANGE = '#E67E22';
+// ─── Constantes de design ───────────────────────────────────────────
+const GREEN_DARK = '#0F5C34';
+const GREEN_MID = '#1E7A46';
+const GREEN_CTA = '#2ECC71';
+const WHITE = '#FFFFFF';
+const TEXT_DARK = '#1A1A1A';
+const TEXT_GRAY = '#6B7280';
+const BORDER_GRAY = '#D1D5DB';
+const INPUT_BG = '#F9FAFB';
 
-function AnimatedView({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: any }) {
+// ─── Composant d'animation ──────────────────────────────────────────
+function AnimatedView({
+  children,
+  delay = 0,
+  style,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  style?: any;
+}) {
   const opacity = useRef(new RNAnimated.Value(0)).current;
-  const translateY = useRef(new RNAnimated.Value(30)).current;
+  const translateY = useRef(new RNAnimated.Value(24)).current;
 
   useEffect(() => {
     RNAnimated.parallel([
-      RNAnimated.timing(opacity, {
-        toValue: 1,
-        duration: 400,
-        delay,
-        useNativeDriver: true,
-      }),
+      RNAnimated.timing(opacity, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
       RNAnimated.spring(translateY, {
         toValue: 0,
         friction: 8,
@@ -38,428 +77,465 @@ function AnimatedView({ children, delay = 0, style }: { children: React.ReactNod
   );
 }
 
-function ShakeView({ children, triggerKey, style }: { children: React.ReactNode; triggerKey: number; style?: any }) {
-  const shakeAnim = useRef(new RNAnimated.Value(0)).current;
+// ─── Composant de champ de formulaire ──────────────────────────────
+interface FormFieldProps {
+  label: string;
+  icon: string;
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  showToggle?: boolean;
+  onToggle?: () => void;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  maxLength?: number;
+  editable?: boolean;
+  delay: number;
+}
 
-  useEffect(() => {
-    if (triggerKey > 0) {
-      RNAnimated.sequence([
-        RNAnimated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: -5, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 5, duration: 60, useNativeDriver: true }),
-        RNAnimated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [triggerKey]);
-
+function FormField({
+  label,
+  icon,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry = false,
+  showToggle,
+  onToggle,
+  keyboardType = 'default',
+  autoCapitalize = 'none',
+  maxLength,
+  editable = true,
+  delay,
+}: FormFieldProps) {
   return (
-    <RNAnimated.View style={[{ transform: [{ translateX: shakeAnim }] }, style]}>
-      {children}
-    </RNAnimated.View>
+    <AnimatedView delay={delay}>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>{label}</Text>
+        <View style={styles.inputWrapper}>
+          <Text style={styles.inputIcon}>{icon}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={placeholder}
+            placeholderTextColor="#9CA3AF"
+            value={value}
+            onChangeText={onChangeText}
+            secureTextEntry={secureTextEntry && !showToggle}
+            keyboardType={keyboardType}
+            autoCapitalize={autoCapitalize}
+            maxLength={maxLength}
+            editable={editable}
+          />
+          {showToggle !== undefined && onToggle && (
+            <Pressable onPress={onToggle} style={styles.eyeButton}>
+              <Text style={styles.eyeIcon}>
+                {showToggle ? '👁️' : '👁️‍🗨️'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </AnimatedView>
   );
 }
 
+// ─── Écran d'inscription ────────────────────────────────────────────
 export default function Register() {
   const router = useRouter();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
   const { login, setRole } = useApp();
-  const role = (roleParam || 'citizen') as Role;
   const insets = useSafeAreaInsets();
 
-  const [name, setName] = useState('');
+  // États des champs
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [error, setError] = useState('');
-  const [activeInput, setActiveInput] = useState<'name' | 'phone' | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // États UI
   const [isLoading, setIsLoading] = useState(false);
-  const [errorKey, setErrorKey] = useState(0);
+  const [error, setError] = useState('');
 
-  const accent = role === 'citizen' ? GREEN : CHARCOAL;
+  const role = (roleParam as Role) || 'citizen';
 
-  const handleSubmit = () => {
-    if (!name.trim()) {
-      setError('Saisis ton nom complet');
-      setErrorKey(prev => prev + 1);
+  // ── Formatage téléphone ───────────────────────────────────────────
+  const handlePhoneChange = (text: string) => {
+    const digits = text.replace(/\D/g, '');
+    setPhone(digits);
+  };
+
+  // ── Soumission ────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!fullName.trim()) {
+      setError('Veuillez entrer votre nom complet');
       return;
     }
-    if (!phone.trim() || phone.length < 10) {
-      setError('Numéro de téléphone invalide (10 chiffres requis)');
-      setErrorKey(prev => prev + 1);
+    if (phone.length < 10) {
+      setError('Veuillez entrer un numéro de téléphone valide (10 chiffres)');
       return;
     }
+    if (!email.trim() || !email.includes('@')) {
+      setError('Veuillez entrer une adresse e-mail valide');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
     setError('');
     setIsLoading(true);
 
+    // Simule une latence réseau
     setTimeout(() => {
-      setIsLoading(false);
-      const user = { name: name.trim(), phone: `+225 ${phone}`, role };
-      login(user);
+      const mockUser = {
+        name: fullName.trim(),
+        phone: `+225 ${phone}`,
+        role,
+      };
+      login(mockUser);
       setRole(role);
-      router.replace((role === 'citizen' ? '/(tabs)/home' : '/(tabs)/home') as any);
+      setIsLoading(false);
+      router.replace('/(tabs)/home');
     }, 1200);
   };
 
+  const handleBack = () => {
+    router.back();
+  };
+
   return (
-    <MobileFrame bgColor="#F8F9F9">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
         keyboardShouldPersistTaps="handled"
+        bounces={false}
       >
-        {/* Back Button */}
-        <AnimatedView delay={0}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Text style={styles.backIcon}>←</Text>
-            <Text style={styles.backText}>Retour</Text>
-          </Pressable>
-        </AnimatedView>
+        {/* ─── Bandeau supérieur ───────────────────────────────────── */}
+        <View style={styles.header}>
+          <View style={styles.headerGradient} />
 
-        {/* Header */}
-        <AnimatedView delay={100}>
-          <View style={styles.header}>
-            <View style={[styles.headerIcon, { backgroundColor: accent, shadowColor: accent }]}>
-              <Text style={styles.headerIconText}>♻️</Text>
-            </View>
-            <View>
-              <Text style={styles.headerTitle}>Créer mon compte</Text>
-              <Text style={[styles.headerSubtitle, { color: accent }]}>
-                {role === 'citizen' ? '🌿 Profil Citoyen' : '🏭 Profil Recycleur Pro'}
-              </Text>
-            </View>
-          </View>
-        </AnimatedView>
-
-        {/* Form Fields */}
-        <View style={styles.formSection}>
-          {/* Name Field */}
-          <AnimatedView delay={200}>
-            <View>
-              <Text style={styles.label}>👤 Ton Nom Complet</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    borderColor: activeInput === 'name' ? accent : name.trim() ? '#34c759' : '#E8ECEF',
-                    shadowColor: activeInput === 'name' ? accent : 'transparent',
-                    shadowOpacity: activeInput === 'name' ? 0.1 : 0,
-                    shadowRadius: activeInput === 'name' ? 16 : 0,
-                  },
-                ]}
-              >
-                <Text style={[styles.inputIcon, { color: activeInput === 'name' ? accent : name.trim() ? '#34c759' : '#94A3B8' }]}>👤</Text>
-                <TextInput
-                  placeholder="Ex: Koné Moussa"
-                  placeholderTextColor="#94A3B8"
-                  value={name}
-                  onChangeText={setName}
-                  onFocus={() => setActiveInput('name')}
-                  onBlur={() => setActiveInput(null)}
-                  editable={!isLoading}
-                  style={styles.textInput}
-                />
-              </View>
-            </View>
+          {/* Flèche retour */}
+          <AnimatedView delay={0} style={styles.headerTopRow}>
+            <Pressable onPress={handleBack} style={styles.backButton}>
+              <Text style={styles.backArrow}>←</Text>
+            </Pressable>
           </AnimatedView>
 
-          {/* Phone Field */}
-          <AnimatedView delay={300}>
-            <View>
-              <Text style={styles.label}>📞 Numéro de Téléphone</Text>
-              <View
-                style={[
-                  styles.inputContainer,
-                  styles.phoneInputContainer,
-                  {
-                    borderColor: activeInput === 'phone' ? accent : phone.length === 10 ? '#34c759' : '#E8ECEF',
-                    shadowColor: activeInput === 'phone' ? accent : 'transparent',
-                    shadowOpacity: activeInput === 'phone' ? 0.1 : 0,
-                    shadowRadius: activeInput === 'phone' ? 16 : 0,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.phonePrefix,
-                    {
-                      backgroundColor: activeInput === 'phone' ? `${accent}10` : '#F8F9FA',
-                      borderRightColor: activeInput === 'phone' ? accent : '#E8ECEF',
-                    },
-                  ]}
-                >
-                  <Text style={[styles.phonePrefixText, { color: activeInput === 'phone' ? accent : CHARCOAL }]}>📞</Text>
-                  <Text style={[styles.phonePrefixCode, { color: activeInput === 'phone' ? accent : CHARCOAL }]}>+225</Text>
-                </View>
-                <TextInput
-                  placeholder="07 00 00 00 00"
-                  placeholderTextColor="#94A3B8"
-                  value={phone}
-                  onChangeText={(val) => setPhone(val.replace(/\D/g, ''))}
-                  maxLength={10}
-                  keyboardType="phone-pad"
-                  onFocus={() => setActiveInput('phone')}
-                  onBlur={() => setActiveInput(null)}
-                  editable={!isLoading}
-                  style={styles.phoneInput}
-                />
-              </View>
-            </View>
-          </AnimatedView>
-
-          {/* Error Alert with Shake */}
-          {error ? (
-            <ShakeView triggerKey={errorKey} style={styles.errorContainer}>
-              <Text style={styles.errorIcon}>⚠️</Text>
-              <Text style={styles.errorText}>{error}</Text>
-            </ShakeView>
-          ) : null}
-
-          {/* Premium Info Panel */}
-          <AnimatedView delay={400}>
-            <View style={[styles.infoPanel, { backgroundColor: `${accent}08`, borderColor: `${accent}25` }]}>
-              <Text style={[styles.infoIcon, { color: accent }]}>ℹ️</Text>
-              <Text style={styles.infoText}>
-                Ton numéro servira pour recevoir ton argent instantanément via Mobile Money (Wave, Orange Money, MTN) dès validation de tes dépôts.
-              </Text>
-            </View>
+          {/* Titres du bandeau */}
+          <AnimatedView delay={100} style={styles.headerTextSection}>
+            <Text style={styles.headerTitle}>Créer un compte</Text>
+            <Text style={styles.headerSubtitle}>
+              Rejoignez la communauté RecyGo CI
+            </Text>
           </AnimatedView>
         </View>
 
-        {/* CTA Button */}
-        <AnimatedView delay={500}>
-          <Pressable
-            onPress={handleSubmit}
-            disabled={isLoading}
-            style={({ pressed }) => [
-              styles.submitButton,
-              {
-                opacity: isLoading ? 0.8 : 1,
-                transform: [{ scale: pressed && !isLoading ? 0.98 : 1 }],
-              },
-            ]}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Text style={styles.submitText}>Créer mon compte</Text>
-                <Text style={styles.submitArrow}>→</Text>
-              </>
-            )}
-          </Pressable>
-        </AnimatedView>
+        {/* ─── Formulaire ──────────────────────────────────────────── */}
+        <View style={styles.formContainer}>
+          {/* Champ 1 : Nom complet */}
+          <FormField
+            label="NOM COMPLET"
+            icon="👤"
+            placeholder="Aya Kouassi"
+            value={fullName}
+            onChangeText={setFullName}
+            autoCapitalize="words"
+            editable={!isLoading}
+            delay={150}
+          />
 
-        {/* Bottom Switch Link */}
-        <AnimatedView delay={600}>
-          <View style={styles.switchContainer}>
-            <Text style={styles.switchText}>Tu as déjà un compte ? </Text>
-            <Pressable onPress={() => router.push(`/(auth)/login?role=${role}` as any)}>
-              <Text style={[styles.switchLink, { color: accent }]}>Se connecter</Text>
+          {/* Champ 2 : Téléphone */}
+          <FormField
+            label="TÉLÉPHONE"
+            icon="📞"
+            placeholder="+225 07 XX XX XX XX"
+            value={phone}
+            onChangeText={handlePhoneChange}
+            keyboardType="phone-pad"
+            maxLength={10}
+            editable={!isLoading}
+            delay={200}
+          />
+
+          {/* Champ 3 : E-mail */}
+          <FormField
+            label="E-MAIL"
+            icon="✉️"
+            placeholder="aya@example.com"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            editable={!isLoading}
+            delay={250}
+          />
+
+          {/* Champ 4 : Mot de passe */}
+          <FormField
+            label="MOT DE PASSE"
+            icon="🔒"
+            placeholder="••••••••"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={true}
+            showToggle={showPassword}
+            onToggle={() => setShowPassword(!showPassword)}
+            editable={!isLoading}
+            delay={300}
+          />
+
+          {/* Message d'erreur */}
+          {error ? (
+            <AnimatedView delay={100}>
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {error}</Text>
+              </View>
+            </AnimatedView>
+          ) : null}
+
+          {/* Bouton Créer mon compte */}
+          <AnimatedView delay={350}>
+            <Pressable
+              onPress={handleSubmit}
+              disabled={isLoading}
+              style={({ pressed }) => [
+                styles.submitButton,
+                {
+                  opacity: isLoading ? 0.7 : pressed ? 0.9 : 1,
+                  transform: [{ scale: pressed && !isLoading ? 0.98 : 1 }],
+                },
+              ]}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={WHITE} />
+              ) : (
+                <Text style={styles.submitText}>Créer mon compte</Text>
+              )}
             </Pressable>
-          </View>
-        </AnimatedView>
+          </AnimatedView>
+
+          {/* Conditions d'utilisation */}
+          <AnimatedView delay={400}>
+            <Text style={styles.termsText}>
+              En créant un compte, vous acceptez nos{' '}
+              <Text style={styles.termsLink}>Conditions d'utilisation</Text> et
+              notre <Text style={styles.termsLink}>Politique de confidentialité</Text>
+            </Text>
+          </AnimatedView>
+
+          {/* Lien vers connexion */}
+          <AnimatedView delay={450}>
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>Déjà un compte ? </Text>
+              <Pressable
+                onPress={() => router.push(`/(auth)/login?role=${role}`)}
+              >
+                <Text style={styles.footerLink}>Se connecter</Text>
+              </Pressable>
+            </View>
+          </AnimatedView>
+
+          <View style={{ height: 40 }} />
+        </View>
       </ScrollView>
-    </MobileFrame>
+    </KeyboardAvoidingView>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  scrollView: {
+  container: {
+    flex: 1,
+    backgroundColor: WHITE,
+  },
+  scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 32,
-    minHeight: 760,
+    flexGrow: 1,
   },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 24,
-    alignSelf: 'flex-start',
-  },
-  backIcon: {
-    fontSize: 20,
-    color: '#64748B',
-  },
-  backText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
+
+  // ── Bandeau supérieur ──
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 32,
-  },
-  headerIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 6 },
+    height: 200,
+    backgroundColor: GREEN_MID,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
-    elevation: 4,
+    elevation: 8,
   },
-  headerIconText: {
-    fontSize: 26,
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: GREEN_DARK,
+    opacity: 0.25,
+  },
+  headerTopRow: {
+    marginBottom: 8,
+    zIndex: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  backArrow: {
+    fontSize: 20,
+    color: WHITE,
+    fontWeight: '700',
+  },
+  headerTextSection: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 16,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: CHARCOAL,
+    fontSize: 22,
+    fontWeight: '700',
+    color: WHITE,
+    textAlign: 'center',
+    marginBottom: 6,
   },
   headerSubtitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
   },
-  formSection: {
-    gap: 20,
+
+  // ── Formulaire ──
+  formContainer: {
     flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+  },
+  fieldGroup: {
+    marginBottom: 18,
   },
   label: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#475569',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: TEXT_GRAY,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+    marginBottom: 8,
   },
-  inputContainer: {
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    borderWidth: 2,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    backgroundColor: INPUT_BG,
+    borderWidth: 1,
+    borderColor: BORDER_GRAY,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 50,
   },
   inputIcon: {
-    fontSize: 18,
+    fontSize: 16,
     marginRight: 10,
+    opacity: 0.6,
   },
-  textInput: {
+  input: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '700',
-    color: '#1E293B',
-    paddingVertical: 16,
+    fontWeight: '500',
+    color: TEXT_DARK,
+    paddingVertical: 0,
   },
-  phoneInputContainer: {
-    overflow: 'hidden',
-    paddingLeft: 0,
+  eyeButton: {
+    padding: 6,
   },
-  phonePrefix: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRightWidth: 2,
+  eyeIcon: {
+    fontSize: 16,
+    opacity: 0.6,
   },
-  phonePrefixText: {
-    fontSize: 14,
-  },
-  phonePrefixCode: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  phoneInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '700',
-    color: CHARCOAL,
-    letterSpacing: 1.5,
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 16,
+
+  // ── Erreur ──
+  errorBox: {
     backgroundColor: '#FEF2F2',
-    borderRadius: 14,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#FECACA',
   },
-  errorIcon: {
-    fontSize: 16,
-  },
   errorText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#DC2626',
-    flex: 1,
-  },
-  infoPanel: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  infoIcon: {
-    fontSize: 20,
-    marginTop: 1,
-  },
-  infoText: {
-    fontSize: 12,
     fontWeight: '600',
-    color: CHARCOAL,
-    lineHeight: 18,
-    flex: 1,
+    color: '#DC2626',
   },
+
+  // ── Bouton Créer mon compte ──
   submitButton: {
-    flexDirection: 'row',
+    width: '100%',
+    height: 52,
+    borderRadius: 999,
+    backgroundColor: GREEN_CTA,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    backgroundColor: ORANGE,
-    borderRadius: 20,
-    paddingVertical: 18,
-    marginTop: 24,
-    shadowColor: ORANGE,
-    shadowOffset: { width: 0, height: 6 },
+    marginTop: 8,
+    shadowColor: GREEN_CTA,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 18,
+    shadowRadius: 12,
     elevation: 6,
   },
   submitText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: WHITE,
   },
-  submitArrow: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    fontWeight: '900',
+
+  // ── Conditions ──
+  termsText: {
+    fontSize: 12,
+    color: TEXT_GRAY,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 20,
+    paddingHorizontal: 8,
   },
-  switchContainer: {
+  termsLink: {
+    fontWeight: '700',
+    color: GREEN_CTA,
+  },
+
+  // ── Footer ──
+  footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 24,
   },
-  switchText: {
+  footerText: {
     fontSize: 13,
-    color: '#64748B',
+    color: TEXT_GRAY,
   },
-  switchLink: {
+  footerLink: {
     fontSize: 13,
-    fontWeight: '900',
-    textDecorationLine: 'underline',
+    fontWeight: '700',
+    color: GREEN_CTA,
   },
 });
 
