@@ -1,27 +1,62 @@
-import { useRouter } from 'expo-router';
-import { View, Text, Pressable, StyleSheet, Animated as RNAnimated } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+/**
+ * Choix du profil — "Qui êtes-vous ?"
+ *
+ * Bandeau supérieur (~30% hauteur) dégradé vert foncé, bord inférieur arrondi.
+ * Titre "Qui êtes-vous ? 🌍" blanc + sous-titre blanc/vert clair.
+ * Sous le bandeau, deux grandes cartes empilées verticalement :
+ *   - Carte "Citoyen" : fond vert pâle (#E9F8EF), icône carrée verte pleine (#2ECC71) maison blanche,
+ *     titre noir, description grise, lien "Choisir →" vert gras.
+ *   - Carte "Recycleur Pro" : fond jaune/crème pâle (#FDF3DD), icône carrée orange pleine camion blanc,
+ *     titre noir, description grise, lien "Choisir →" orange gras.
+ * Navigation: Citoyen → /register?role=citizen, Pro → /register?role=pro
+ */
+
 import { useRef, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Animated as RNAnimated,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '@/context/AppContext';
-import { MobileFrame } from '@/components/MobileFrame';
 
-const GREEN = '#2ECC71';
-const CHARCOAL = '#2C3E50';
-const ORANGE = '#E67E22';
+// ─── Constantes de design ───────────────────────────────────────────
+const GREEN_DARK = '#0F5C34';
+const GREEN_MID = '#1E7A46';
+const GREEN_BRIGHT = '#2ECC71';
+const GREEN_CTA = '#2ECC71';
+const ORANGE = '#EA8A2E';
+const WHITE = '#FFFFFF';
+const TEXT_DARK = '#1A1A1A';
+const TEXT_GRAY = '#6B7280';
+const CARD_CITIZEN_BG = '#E9F8EF';
+const CARD_PRO_BG = '#FDF3DD';
 
-function AnimatedPressable({ onPress, children, delay = 0 }: { onPress: () => void; children: React.ReactNode; delay?: number }) {
+const { width } = Dimensions.get('window');
+const CARD_MARGIN = 20;
+const CARD_WIDTH = width - CARD_MARGIN * 2;
+
+// ─── Composant d'animation réutilisable ─────────────────────────────
+function AnimatedView({
+  children,
+  delay = 0,
+  style,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  style?: any;
+}) {
   const opacity = useRef(new RNAnimated.Value(0)).current;
   const translateY = useRef(new RNAnimated.Value(30)).current;
-  const scale = useRef(new RNAnimated.Value(1)).current;
 
   useEffect(() => {
     RNAnimated.parallel([
-      RNAnimated.timing(opacity, {
-        toValue: 1,
-        duration: 400,
-        delay,
-        useNativeDriver: true,
-      }),
+      RNAnimated.timing(opacity, { toValue: 1, duration: 500, delay, useNativeDriver: true }),
       RNAnimated.spring(translateY, {
         toValue: 0,
         friction: 8,
@@ -32,8 +67,29 @@ function AnimatedPressable({ onPress, children, delay = 0 }: { onPress: () => vo
     ]).start();
   }, []);
 
+  return (
+    <RNAnimated.View style={[{ opacity, transform: [{ translateY }] }, style]}>
+      {children}
+    </RNAnimated.View>
+  );
+}
+
+// ─── Carte de rôle ──────────────────────────────────────────────────
+interface RoleCardProps {
+  type: 'citizen' | 'pro';
+  icon: string;
+  title: string;
+  description: string;
+  onChoose: () => void;
+  delay: number;
+}
+
+function RoleCard({ type, icon, title, description, onChoose, delay }: RoleCardProps) {
+  const isCitizen = type === 'citizen';
+  const scaleAnim = useRef(new RNAnimated.Value(1)).current;
+
   const handlePressIn = () => {
-    RNAnimated.spring(scale, {
+    RNAnimated.spring(scaleAnim, {
       toValue: 0.97,
       friction: 8,
       tension: 100,
@@ -42,7 +98,7 @@ function AnimatedPressable({ onPress, children, delay = 0 }: { onPress: () => vo
   };
 
   const handlePressOut = () => {
-    RNAnimated.spring(scale, {
+    RNAnimated.spring(scaleAnim, {
       toValue: 1,
       friction: 5,
       tension: 60,
@@ -51,377 +107,296 @@ function AnimatedPressable({ onPress, children, delay = 0 }: { onPress: () => vo
   };
 
   return (
-    <RNAnimated.View style={{ opacity, transform: [{ translateY }, { scale }] }}>
+    <RNAnimated.View style={{ transform: [{ scale: scaleAnim }] }}>
       <Pressable
-        onPress={onPress}
+        onPress={onChoose}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
       >
-        {children}
+        <AnimatedView delay={delay}>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: isCitizen ? CARD_CITIZEN_BG : CARD_PRO_BG },
+            ]}
+          >
+            {/* Haut de carte : icône + titre */}
+            <View style={styles.cardTop}>
+              <View
+                style={[
+                  styles.iconBox,
+                  { backgroundColor: isCitizen ? GREEN_CTA : ORANGE },
+                ]}
+              >
+                <Text style={styles.iconText}>{icon}</Text>
+              </View>
+              <View style={styles.cardTitleArea}>
+                <Text style={styles.cardTitle}>{title}</Text>
+              </View>
+            </View>
+
+            {/* Description */}
+            <Text style={styles.cardDescription}>{description}</Text>
+
+            {/* Lien Choisir */}
+            <View style={styles.cardFooter}>
+              <Text
+                style={[
+                  styles.chooseLink,
+                  { color: isCitizen ? GREEN_MID : ORANGE },
+                ]}
+              >
+                Choisir →
+              </Text>
+            </View>
+          </View>
+        </AnimatedView>
       </Pressable>
     </RNAnimated.View>
   );
 }
 
-function SpinningLogo() {
-  const rotateAnim = useRef(new RNAnimated.Value(0)).current;
-
-  useEffect(() => {
-    const spin = () => {
-      rotateAnim.setValue(0);
-      RNAnimated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 15000,
-        useNativeDriver: true,
-      }).start(() => spin());
-    };
-    spin();
-  }, []);
-
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  return (
-    <View style={styles.logoWrapper}>
-      <View style={styles.halo} />
-      <RNAnimated.View style={[styles.logoCircle, { transform: [{ rotate }] }]}>
-        <Text style={styles.logoIcon}>♻️</Text>
-      </RNAnimated.View>
-    </View>
-  );
-}
-
-function PulseHalo() {
-  const pulseAnim = useRef(new RNAnimated.Value(1)).current;
-
-  useEffect(() => {
-    const pulse = () => {
-      RNAnimated.sequence([
-        RNAnimated.timing(pulseAnim, {
-          toValue: 0.6,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ]).start(() => pulse());
-    };
-    pulse();
-  }, []);
-
-  return (
-    <RNAnimated.View
-      style={{
-        position: 'absolute',
-        width: 72,
-        height: 72,
-        borderRadius: 24,
-        backgroundColor: GREEN,
-        opacity: pulseAnim.interpolate({
-          inputRange: [0.6, 1],
-          outputRange: [0.12, 0.25],
-        }),
-      }}
-    />
-  );
-}
-
+// ─── Écran principal ────────────────────────────────────────────────
 export default function RoleSelection() {
   const router = useRouter();
   const { setRole } = useApp();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
 
-  const handleCitizen = () => {
+  const handleChooseCitizen = () => {
     setRole('citizen');
-    router.push(`/(auth)/register?role=citizen` as any);
+    router.push('/(auth)/register?role=citizen');
   };
 
-  const handlePro = () => {
+  const handleChoosePro = () => {
     setRole('pro');
-    router.push(`/(auth)/register?role=pro` as any);
+    router.push('/(auth)/register?role=pro');
+  };
+
+  const handleBack = () => {
+    router.back();
   };
 
   return (
-    <MobileFrame bgColor="#F8F9F9">
-      <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-        {/* Top & Logo */}
-        <View style={styles.topSection}>
-          <AnimatedPressable onPress={() => {}} delay={0}>
-            <View style={styles.logoSection}>
-              <SpinningLogo />
-              <PulseHalo />
-              <Text style={styles.brandName}>RecyGo</Text>
-              <Text style={styles.tagline}>
-                Transforme tes déchets en argent de façon moderne
-              </Text>
-            </View>
-          </AnimatedPressable>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* ─── Bandeau supérieur dégradé ───────────────────────────── */}
+        <View style={[styles.headerBanner, { paddingTop: insets.top + 16 }]}>
+          {/* Dégradé visuel (simulé avec overlay) */}
+          <View style={styles.gradientOverlay} />
 
-          <AnimatedPressable onPress={() => {}} delay={150}>
-            <View style={styles.titleSection}>
-              <Text style={styles.title}>Qui es-tu ?</Text>
-              <Text style={styles.subtitle}>
-                Choisis ton profil pour commencer l'aventure
-              </Text>
+          {/* Bouton retour */}
+          <AnimatedView delay={0} style={styles.backRow}>
+            <Pressable onPress={handleBack} style={styles.backButton}>
+              <Text style={styles.backArrow}>←</Text>
+            </Pressable>
+          </AnimatedView>
+
+          {/* Contenu du bandeau */}
+          <AnimatedView delay={100} style={styles.headerContent}>
+            <View style={styles.headerLogo}>
+              <Text style={styles.headerLogoText}>♻️</Text>
             </View>
-          </AnimatedPressable>
+            <Text style={styles.headerTitle}>Qui êtes-vous ? 🌍</Text>
+            <Text style={styles.headerSubtitle}>
+              Choisissez votre profil pour commencer
+            </Text>
+          </AnimatedView>
         </View>
 
-        {/* Role Cards */}
+        {/* ─── Zone des cartes (remonte sur le bandeau) ──────────── */}
         <View style={styles.cardsSection}>
-          {/* Citizen Card */}
-          <AnimatedPressable onPress={handleCitizen} delay={300}>
-            <View style={[styles.roleCard, styles.citizenCard]}>
-              <View style={styles.roleIconContainer}>
-                <Text style={styles.roleIcon}>🌿</Text>
-              </View>
-              <View style={styles.roleContent}>
-                <View style={styles.roleHeader}>
-                  <Text style={styles.roleName}>🧑‍🤝‍🧑 Citoyen</Text>
-                  <View style={styles.badge}>
-                    <Text style={[styles.badgeText, { color: GREEN }]}>Vendeur</Text>
-                  </View>
-                </View>
-                <Text style={styles.roleAction}>Je veux vendre mes déchets</Text>
-                <Text style={styles.roleDesc}>
-                  Prends une photo de tes déchets et reçois de l'argent directement sur Mobile Money.
-                </Text>
-              </View>
-            </View>
-          </AnimatedPressable>
+          {/* Carte Citoyen */}
+          <RoleCard
+            type="citizen"
+            icon="🏠"
+            title="Citoyen"
+            description="J'ai des déchets à recycler et je veux gagner de l'argent"
+            onChoose={handleChooseCitizen}
+            delay={250}
+          />
 
-          {/* Pro Card */}
-          <AnimatedPressable onPress={handlePro} delay={450}>
-            <View style={[styles.roleCard, styles.proCard]}>
-              <View style={[styles.roleIconContainer, styles.proIconContainer]}>
-                <Text style={styles.roleIcon}>🏭</Text>
-              </View>
-              <View style={styles.roleContent}>
-                <View style={styles.roleHeader}>
-                  <Text style={styles.proName}>🏭 Recycleur Pro</Text>
-                  <View style={[styles.badge, styles.proBadge]}>
-                    <Text style={[styles.badgeText, { color: ORANGE }]}>Collecteur</Text>
-                  </View>
-                </View>
-                <Text style={styles.proAction}>Je gère les collectes</Text>
-                <Text style={styles.proDesc}>
-                  Suis ton inventaire, gère tes tournées de ramassage et connecte-toi aux usines.
-                </Text>
-              </View>
-            </View>
-          </AnimatedPressable>
+          {/* Carte Recycleur Pro */}
+          <RoleCard
+            type="pro"
+            icon="🚛"
+            title="Recycleur Pro"
+            description="Je collecte et revends les déchets recyclables"
+            onChoose={handleChoosePro}
+            delay={400}
+          />
+
+          {/* Espace en bas */}
+          <View style={{ height: 40 }} />
         </View>
-
-        {/* Footer */}
-        <AnimatedPressable onPress={() => {}} delay={600}>
-          <Text style={styles.footer}>
-            En continuant, tu acceptes nos{' '}
-            <Text style={styles.footerLink}>Conditions d'utilisation</Text>
-          </Text>
-        </AnimatedPressable>
-      </View>
-    </MobileFrame>
+      </ScrollView>
+    </View>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+
+  // ── Bandeau supérieur ──
+  headerBanner: {
+    height: 280,
+    backgroundColor: GREEN_MID,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+    justifyContent: 'flex-start',
     paddingHorizontal: 24,
-    paddingBottom: 32,
-    justifyContent: 'space-between',
-    minHeight: 760,
-  },
-  topSection: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  logoWrapper: {
-    width: 80,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  halo: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: GREEN,
-    opacity: 0.15,
-    top: 0,
-    left: 0,
-  },
-  logoCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 24,
-    backgroundColor: GREEN,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 8,
   },
-  logoIcon: {
-    fontSize: 36,
+  gradientOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: GREEN_DARK,
+    opacity: 0.3,
   },
-  brandName: {
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    color: CHARCOAL,
-    textAlign: 'center',
+
+  // ── Bouton retour ──
+  backRow: {
+    alignSelf: 'flex-start',
+    zIndex: 10,
+    marginBottom: 8,
   },
-  tagline: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  titleSection: {
-    width: '100%',
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
-    marginVertical: 24,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: CHARCOAL,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  cardsSection: {
-    gap: 20,
-    flex: 1,
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  roleCard: {
-    flexDirection: 'row',
+  backArrow: {
+    fontSize: 20,
+    color: WHITE,
+    fontWeight: '700',
+  },
+
+  // ── Contenu du bandeau ──
+  headerContent: {
     alignItems: 'center',
-    borderRadius: 24,
-    padding: 24,
-    gap: 16,
+    justifyContent: 'center',
+    flex: 1,
+    paddingBottom: 20,
   },
-  citizenCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: GREEN,
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    elevation: 4,
-  },
-  proCard: {
-    backgroundColor: CHARCOAL,
-    borderWidth: 2,
-    borderColor: '#34495E',
-    shadowColor: CHARCOAL,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 4,
-  },
-  roleIconContainer: {
+  headerLogo: {
     width: 56,
     height: 56,
     borderRadius: 16,
-    backgroundColor: `${GREEN}12`,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  proIconContainer: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  roleIcon: {
+  headerLogoText: {
     fontSize: 28,
   },
-  roleContent: {
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: WHITE,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+  },
+
+  // ── Zone des cartes ──
+  cardsSection: {
+    flex: 1,
+    paddingHorizontal: CARD_MARGIN,
+    paddingTop: 24,
+    gap: 20,
+  },
+
+  // ── Carte ──
+  card: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  iconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  iconText: {
+    fontSize: 24,
+    color: WHITE,
+  },
+  cardTitleArea: {
     flex: 1,
   },
-  roleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  roleName: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: CHARCOAL,
-  },
-  proName: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  badge: {
-    backgroundColor: `${GREEN}15`,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  proBadge: {
-    backgroundColor: `${ORANGE}22`,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  roleAction: {
-    fontSize: 13,
+  cardTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#27AE60',
-    marginTop: 4,
+    color: TEXT_DARK,
   },
-  proAction: {
+  cardDescription: {
     fontSize: 13,
+    fontWeight: '400',
+    color: TEXT_GRAY,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  cardFooter: {
+    alignItems: 'flex-end',
+  },
+  chooseLink: {
+    fontSize: 14,
     fontWeight: '700',
-    color: ORANGE,
-    marginTop: 4,
-  },
-  roleDesc: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  proDesc: {
-    fontSize: 12,
-    color: '#CBD5E1',
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  footer: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginTop: 24,
-  },
-  footerLink: {
-    textDecorationLine: 'underline',
-    fontWeight: '600',
-    color: '#64748B',
   },
 });
 

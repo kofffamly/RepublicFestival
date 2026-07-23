@@ -1,254 +1,364 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+/**
+ * Profil Citoyen — RecyGo CI
+ *
+ * Écran de profil utilisateur avec :
+ * - En-tête vert foncé (~35% hauteur) :
+ *   - Titre "Profil" blanc centré
+ *   - Avatar rond (72px) avec initiales "AK" en vert gras
+ *   - Nom "Aya Kouassi" blanc (18px)
+ *   - Email "aya.kouassi@example.com" vert clair (13px)
+ *   - Badge pill "Membre depuis mai 2025"
+ *   - 3 stats : Collectes (5), Recyclé (20 kg), Revenus (3 092 F)
+ * - Corps blanc (radius haut arrondi) :
+ *   - 6 lignes de menu avec icône carrée colorée + chevron
+ *   - Déconnexion en rouge
+ * - Barre de navigation inférieure avec onglet Profil actif
+ */
 
-const COLORS = {
-  green: '#2ECC71',
-  charcoal: '#2C3E50',
-  orange: '#E67E22',
-  white: '#FFFFFF',
-  lightBg: '#F8F9F9',
-};
+import { useRef, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Animated as RNAnimated,
+  ScrollView,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useApp } from '@/context/AppContext';
 
+// ─── Constantes de design ───────────────────────────────────────────
+const GREEN_DARK = '#0F5C34';
+const GREEN_MID = '#1E7A46';
+const GREEN_CTA = '#2ECC71';
+const WHITE = '#FFFFFF';
+const TEXT_DARK = '#111827';
+const TEXT_GRAY = '#6B7280';
+const BG_LIGHT = '#F8FAFC';
+const RED = '#EF4444';
+
+// ─── Données des menus ──────────────────────────────────────────────
 const MENU_ITEMS = [
-  { emoji: '🔔', label: 'Notifications', desc: 'Alertes collectes activées' },
-  { emoji: '🛡️', label: 'Confidentialité', desc: 'Données personnelles cryptées' },
-  { emoji: '❓', label: 'Aide & Support', desc: 'FAQ, Assistance 24h/7' },
-  { emoji: 'ℹ️', label: 'À propos', desc: 'Version 1.0.0' },
+  { icon: '👤', label: 'Mes informations', bg: '#EFF6FF' },
+  { icon: '🔔', label: 'Notifications', bg: '#FFF7ED' },
+  { icon: '🛡️', label: 'Sécurité & confidentialité', bg: '#F0FDF4' },
+  { icon: '❓', label: "Centre d'aide", bg: '#F5F3FF' },
+  { icon: '⚙️', label: 'Paramètres', bg: '#F3F4F6' },
+  { icon: '🚪', label: 'Déconnexion', bg: '#FEF2F2', isRed: true },
 ];
 
-export default function ProfileScreen() {
+// ─── Composant d'animation ──────────────────────────────────────────
+function AnimatedView({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: any }) {
+  const opacity = useRef(new RNAnimated.Value(0)).current;
+  const translateY = useRef(new RNAnimated.Value(20)).current;
+
+  useEffect(() => {
+    RNAnimated.parallel([
+      RNAnimated.timing(opacity, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
+      RNAnimated.spring(translateY, { toValue: 0, friction: 8, tension: 60, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return <RNAnimated.View style={[{ opacity, transform: [{ translateY }] }, style]}>{children}</RNAnimated.View>;
+}
+
+// ─── Composant d'animation Pressable ────────────────────────────────
+function AnimatedPressable({ onPress, children, style }: { onPress?: () => void; children: React.ReactNode; style?: any }) {
+  const scale = useRef(new RNAnimated.Value(1)).current;
+  const handlePressIn = () => RNAnimated.spring(scale, { toValue: 0.97, friction: 8, tension: 100, useNativeDriver: true }).start();
+  const handlePressOut = () => RNAnimated.spring(scale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }).start();
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.container}>
-        {/* Profile Header */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarEmoji}>🌿</Text>
-          </View>
-          <Text style={styles.profileName}>Utilisateur</Text>
-          <Text style={styles.profilePhone}>+225 07 00 00 00 00</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Niveau 4 · Protecteur Vert</Text>
-          </View>
-        </View>
-
-        {/* Stats Overview */}
-        <Text style={styles.sectionTitle}>Mes Statistiques</Text>
-        <View style={styles.statsCard}>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Total recyclé</Text>
-            <Text style={styles.statValue}>45 kg</Text>
-          </View>
-          <View style={[styles.statRow, styles.statBorder]}>
-            <Text style={styles.statLabel}>Gains totaux</Text>
-            <Text style={[styles.statValue, { color: COLORS.green }]}>2 450 FCFA</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Collectes effectuées</Text>
-            <Text style={styles.statValue}>12</Text>
-          </View>
-        </View>
-
-        {/* Menu */}
-        <Text style={styles.sectionTitle}>Mon compte</Text>
-        <View style={styles.menuCard}>
-          {MENU_ITEMS.map((item, idx) => (
-            <Pressable
-              key={idx}
-              style={({ pressed }) => [
-                styles.menuItem,
-                idx < MENU_ITEMS.length - 1 && styles.menuBorder,
-                pressed && styles.menuPressed,
-              ]}
-            >
-              <Text style={styles.menuEmoji}>{item.emoji}</Text>
-              <View style={styles.menuInfo}>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Text style={styles.menuDesc}>{item.desc}</Text>
-              </View>
-              <Text style={styles.menuArrow}>›</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Logout */}
-        <Pressable style={({ pressed }) => [styles.logoutBtn, pressed && styles.logoutPressed]}>
-          <Text style={styles.logoutText}>Se déconnecter</Text>
-        </Pressable>
-
-        <Text style={styles.footer}>RecyGo App v1.0.0 · Fait avec ♻️ à Abidjan</Text>
-      </ScrollView>
-    </SafeAreaView>
+    <RNAnimated.View style={[{ transform: [{ scale }] }, style]}>
+      <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+        {children}
+      </Pressable>
+    </RNAnimated.View>
   );
 }
 
+// ─── Écran de profil ────────────────────────────────────────────────
+export default function ProfileScreen() {
+  const router = useRouter();
+  const { user, logout } = useApp();
+  const insets = useSafeAreaInsets();
+
+  const initials = user?.name
+    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'AK'
+    : 'AK';
+
+  const displayName = user?.name || 'Aya Kouassi';
+  const displayEmail = user?.phone
+    ? `${user.name?.toLowerCase().replace(/\s/g, '.')}@example.com`
+    : 'aya.kouassi@example.com';
+
+  const handleMenuPress = (label: string) => {
+    if (label === 'Déconnexion') {
+      logout();
+      router.replace('/splash' as any);
+    }
+    // Autres menus à implémenter
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* ─── En-tête vert foncé ──────────────────────────────────── */}
+        <View style={styles.header}>
+          {/* Titre */}
+          <AnimatedView delay={0} style={styles.headerTopRow}>
+            <Text style={styles.headerTitle}>Profil</Text>
+          </AnimatedView>
+
+          {/* Avatar */}
+          <AnimatedView delay={100} style={styles.avatarSection}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+            <Text style={styles.userName}>{displayName}</Text>
+            <Text style={styles.userEmail}>{displayEmail}</Text>
+
+            {/* Badge membre */}
+            <View style={styles.badgePill}>
+              <Text style={styles.badgeText}>Membre depuis mai 2025</Text>
+            </View>
+          </AnimatedView>
+
+          {/* 3 stats */}
+          <AnimatedView delay={150}>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>5</Text>
+                <Text style={styles.statLabel}>Collectes</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>20 kg</Text>
+                <Text style={styles.statLabel}>Recyclé</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>3 092 F</Text>
+                <Text style={styles.statLabel}>Revenus</Text>
+              </View>
+            </View>
+          </AnimatedView>
+        </View>
+
+        {/* ─── Corps blanc ─────────────────────────────────────────── */}
+        <View style={styles.body}>
+          {/* Liste de menus */}
+          <AnimatedView delay={200}>
+            <View style={styles.menuCard}>
+              {MENU_ITEMS.map((item, idx) => (
+                <AnimatedPressable
+                  key={idx}
+                  onPress={() => handleMenuPress(item.label)}
+                >
+                  <View style={styles.menuItem}>
+                    <View style={[styles.menuIconBox, { backgroundColor: item.bg }]}>
+                      <Text style={styles.menuIcon}>{item.icon}</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.menuLabel,
+                        item.isRed && { color: RED },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    <Text style={styles.menuChevron}>›</Text>
+                  </View>
+                  {idx < MENU_ITEMS.length - 1 && <View style={styles.menuDivider} />}
+                </AnimatedPressable>
+              ))}
+            </View>
+          </AnimatedView>
+
+          <View style={{ height: 100 }} />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── Styles ────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.lightBg,
-  },
-  scrollView: {
-    flex: 1,
-  },
   container: {
-    padding: 20,
-    paddingBottom: 40,
+    flex: 1,
+    backgroundColor: GREEN_MID,
   },
-  profileCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 24,
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+
+  // ── En-tête ──
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
   },
-  avatarContainer: {
+  headerTopRow: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: WHITE,
+  },
+
+  // ── Avatar ──
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  avatarCircle: {
     width: 72,
     height: 72,
-    borderRadius: 24,
-    backgroundColor: '#E8F8F5',
+    borderRadius: 36,
+    backgroundColor: WHITE,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  avatarEmoji: {
-    fontSize: 36,
+  avatarText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: GREEN_CTA,
   },
-  profileName: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: COLORS.charcoal,
+  userName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: WHITE,
+    marginBottom: 4,
   },
-  profilePhone: {
+  userEmail: {
     fontSize: 13,
-    color: '#64748B',
-    marginTop: 4,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 10,
   },
-  badge: {
-    backgroundColor: '#F0FFF4',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+
+  // ── Badge ──
+  badgePill: {
+    paddingHorizontal: 14,
     paddingVertical: 4,
-    marginTop: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.green,
+    fontWeight: '500',
+    color: WHITE,
+    opacity: 0.9,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  statsCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statRow: {
+
+  // ── Stats ──
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 8,
     paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  statBorder: {
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '600',
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
   },
   statValue: {
     fontSize: 16,
-    fontWeight: '900',
-    color: COLORS.charcoal,
+    fontWeight: '700',
+    color: WHITE,
+    marginBottom: 2,
   },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+
+  // ── Corps ──
+  body: {
+    flex: 1,
+    backgroundColor: BG_LIGHT,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+
+  // ── Menu ──
   menuCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: WHITE,
     borderRadius: 20,
     overflow: 'hidden',
-    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  menuBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8F9FA',
+  menuIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  menuPressed: {
-    backgroundColor: '#F8F9FA',
-  },
-  menuEmoji: {
-    fontSize: 22,
-    marginRight: 12,
-  },
-  menuInfo: {
-    flex: 1,
+  menuIcon: {
+    fontSize: 16,
   },
   menuLabel: {
+    flex: 1,
     fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.charcoal,
+    fontWeight: '600',
+    color: TEXT_DARK,
   },
-  menuDesc: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  menuArrow: {
-    fontSize: 22,
-    color: '#CBD5E1',
+  menuChevron: {
+    fontSize: 20,
     fontWeight: '300',
+    color: '#CBD5E1',
+    marginLeft: 8,
   },
-  logoutBtn: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 20,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FEE2E2',
-  },
-  logoutPressed: {
-    backgroundColor: '#FEE2E2',
-  },
-  logoutText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#EF4444',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  footer: {
-    fontSize: 11,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginTop: 24,
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginLeft: 66,
   },
 });
 
