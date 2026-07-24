@@ -4,13 +4,13 @@
  * Écran de profil utilisateur avec :
  * - En-tête vert foncé (~35% hauteur) :
  *   - Titre "Profil" blanc centré
- *   - Avatar rond (72px) avec initiales "AK" en vert gras
- *   - Nom "Aya Kouassi" blanc (18px)
- *   - Email "aya.kouassi@example.com" vert clair (13px)
- *   - Badge pill "Membre depuis mai 2025"
- *   - 3 stats : Collectes (5), Recyclé (20 kg), Revenus (3 092 F)
+ *   - Avatar rond (72px) avec initiales en vert gras
+ *   - Nom + Email depuis le contexte utilisateur
+ *   - Badge pill "Membre depuis ..."
+ *   - 3 stats : Collectes, Recyclé, Revenus
  * - Corps blanc (radius haut arrondi) :
  *   - 6 lignes de menu avec icône carrée colorée + chevron
+ *   - Navigation vers les écrans détail
  *   - Déconnexion en rouge
  * - Barre de navigation inférieure avec onglet Profil actif
  */
@@ -40,12 +40,12 @@ const RED = '#EF4444';
 
 // ─── Données des menus ──────────────────────────────────────────────
 const MENU_ITEMS = [
-  { icon: '👤', label: 'Mes informations', bg: '#EFF6FF' },
-  { icon: '🔔', label: 'Notifications', bg: '#FFF7ED' },
-  { icon: '🛡️', label: 'Sécurité & confidentialité', bg: '#F0FDF4' },
-  { icon: '❓', label: "Centre d'aide", bg: '#F5F3FF' },
-  { icon: '⚙️', label: 'Paramètres', bg: '#F3F4F6' },
-  { icon: '🚪', label: 'Déconnexion', bg: '#FEF2F2', isRed: true },
+  { icon: '👤', label: 'Mes informations', bg: '#EFF6FF', route: '/(citizen)/personal-info' },
+  { icon: '🔔', label: 'Notifications', bg: '#FFF7ED', route: '/(citizen)/notifications' },
+  { icon: '🛡️', label: 'Sécurité & confidentialité', bg: '#F0FDF4', route: '/(citizen)/security' },
+  { icon: '❓', label: "Centre d'aide", bg: '#F5F3FF', route: '/(citizen)/help' },
+  { icon: '⚙️', label: 'Paramètres', bg: '#F3F4F6', route: '/(citizen)/settings' },
+  { icon: '🚪', label: 'Déconnexion', bg: '#FEF2F2', route: null, isRed: true },
 ];
 
 // ─── Composant d'animation ──────────────────────────────────────────
@@ -89,16 +89,20 @@ export default function ProfileScreen() {
     : 'AK';
 
   const displayName = user?.name || 'Aya Kouassi';
-  const displayEmail = user?.phone
+  const displayEmail = user?.email || user?.phone
     ? `${user.name?.toLowerCase().replace(/\s/g, '.')}@example.com`
     : 'aya.kouassi@example.com';
+  const displayMemberSince = user?.memberSince || 'mai 2025';
 
-  const handleMenuPress = (label: string) => {
-    if (label === 'Déconnexion') {
+  const handleMenuPress = (item: typeof MENU_ITEMS[0]) => {
+    if (item.label === 'Déconnexion') {
       logout();
-      router.replace('/splash' as any);
+      router.replace('/splash');
+      return;
     }
-    // Autres menus à implémenter
+    if (item.route) {
+      router.push(item.route as any);
+    }
   };
 
   return (
@@ -126,7 +130,7 @@ export default function ProfileScreen() {
 
             {/* Badge membre */}
             <View style={styles.badgePill}>
-              <Text style={styles.badgeText}>Membre depuis mai 2025</Text>
+              <Text style={styles.badgeText}>Membre depuis {displayMemberSince}</Text>
             </View>
           </AnimatedView>
 
@@ -134,17 +138,17 @@ export default function ProfileScreen() {
           <AnimatedView delay={150}>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>5</Text>
+                <Text style={styles.statValue}>{user?.collections ?? 5}</Text>
                 <Text style={styles.statLabel}>Collectes</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>20 kg</Text>
+                <Text style={styles.statValue}>{user?.recycledKg ?? 20} kg</Text>
                 <Text style={styles.statLabel}>Recyclé</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>3 092 F</Text>
+                <Text style={styles.statValue}>{user?.earnings ?? 3092} F</Text>
                 <Text style={styles.statLabel}>Revenus</Text>
               </View>
             </View>
@@ -159,7 +163,7 @@ export default function ProfileScreen() {
               {MENU_ITEMS.map((item, idx) => (
                 <AnimatedPressable
                   key={idx}
-                  onPress={() => handleMenuPress(item.label)}
+                  onPress={() => handleMenuPress(item)}
                 >
                   <View style={styles.menuItem}>
                     <View style={[styles.menuIconBox, { backgroundColor: item.bg }]}>
@@ -361,4 +365,3 @@ const styles = StyleSheet.create({
     marginLeft: 66,
   },
 });
-

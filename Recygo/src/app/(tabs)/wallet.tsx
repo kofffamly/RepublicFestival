@@ -4,8 +4,8 @@
  * Écran de portefeuille/wallet avec :
  * - En-tête vert foncé dégradé (~35% hauteur)
  *   - "Portefeuille" blanc gras à gauche + icône "..." à droite
- *   - Solde disponible : "4 250 FCFA" en blanc très gras
- *   - 2 boutons : "Retirer" (blanc) et "Statistiques" (translucide)
+ *   - Solde disponible depuis le contexte utilisateur
+ *   - 2 boutons : "Retirer" (blanc, → /argent) et "Statistiques" (translucide)
  * - Corps blanc :
  *   - Carte "Revenus — Juillet 2026" avec graphique en barres
  *   - Liste "Transactions récentes"
@@ -13,6 +13,7 @@
  */
 
 import { useRef, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -99,6 +100,7 @@ function ChartBar({ value, maxValue, label }: { value: number; maxValue: number;
 
 // ─── Écran Portefeuille ─────────────────────────────────────────────
 export default function WalletScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { balance } = useApp();
 
@@ -125,7 +127,7 @@ export default function WalletScreen() {
           <AnimatedView delay={100} style={styles.balanceSection}>
             <Text style={styles.balanceLabel}>Solde disponible</Text>
             <View style={styles.balanceRow}>
-              <Text style={styles.balanceValue}>4 250</Text>
+              <Text style={styles.balanceValue}>{balance.toLocaleString('fr-FR')}</Text>
               <Text style={styles.balanceUnit}>FCFA</Text>
             </View>
           </AnimatedView>
@@ -133,7 +135,10 @@ export default function WalletScreen() {
           {/* Boutons actions */}
           <AnimatedView delay={150}>
             <View style={styles.actionBtnsRow}>
-              <Pressable style={styles.actionBtnWhite}>
+              <Pressable
+                style={styles.actionBtnWhite}
+                onPress={() => router.push('/argent')}
+              >
                 <Text style={styles.actionBtnIcon}>↗</Text>
                 <Text style={styles.actionBtnTextDark}>Retirer</Text>
               </Pressable>
@@ -445,4 +450,3 @@ const styles = StyleSheet.create({
     marginLeft: 64,
   },
 });
-

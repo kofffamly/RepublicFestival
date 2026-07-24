@@ -1,60 +1,36 @@
-import { Pressable, Text, StyleSheet, ActivityIndicator, ViewStyle, PressableStateCallbackType, StyleProp } from 'react-native';
+import {
+  Pressable,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  GestureResponderEvent,
+  ActivityIndicator,
+} from 'react-native';
 
-interface ButtonProps {
+import { COLORS, RADIUS, FONT_SIZE, FONT_WEIGHT, SHADOWS } from '@/constants/theme';
+
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
+export type ButtonSize = 'sm' | 'md' | 'lg';
+
+export interface ButtonProps {
   title: string;
-  onPress?: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
+  onPress?: (event: GestureResponderEvent) => void;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   disabled?: boolean;
-  icon?: string;
-  style?: StyleProp<ViewStyle>;
+  loading?: boolean;
+  style?: ViewStyle;
+  textStyle?: TextStyle;
+  icon?: React.ReactNode;
+  iconPosition?: 'left' | 'right';
+  fullWidth?: boolean;
 }
 
-const COLORS = {
-  green: '#2ECC71',
-  charcoal: '#2C3E50',
-  orange: '#E67E22',
-  white: '#FFFFFF',
-};
-
-const VARIANT_STYLES = {
-  primary: {
-    bg: COLORS.orange,
-    text: COLORS.white,
-    shadow: COLORS.orange,
-    pressedBg: '#D35400',
-  },
-  secondary: {
-    bg: COLORS.green,
-    text: COLORS.white,
-    shadow: COLORS.green,
-    pressedBg: '#27AE60',
-  },
-  outline: {
-    bg: 'transparent',
-    text: COLORS.charcoal,
-    shadow: 'transparent',
-    pressedBg: '#F8F9FA',
-  },
-  ghost: {
-    bg: 'transparent',
-    text: COLORS.charcoal,
-    shadow: 'transparent',
-    pressedBg: '#F1F5F9',
-  },
-  danger: {
-    bg: '#FEF2F2',
-    text: '#EF4444',
-    shadow: 'transparent',
-    pressedBg: '#FEE2E2',
-  },
-};
-
-const SIZE_STYLES = {
-  sm: { paddingVertical: 10, paddingHorizontal: 16, fontSize: 12 },
-  md: { paddingVertical: 16, paddingHorizontal: 24, fontSize: 14 },
-  lg: { paddingVertical: 18, paddingHorizontal: 32, fontSize: 16 },
+const SIZE_CONFIG: Record<ButtonSize, { paddingVertical: number; fontSize: number; height: number }> = {
+  sm: { paddingVertical: 8, fontSize: FONT_SIZE.sm, height: 36 },
+  md: { paddingVertical: 12, fontSize: FONT_SIZE.md, height: 48 },
+  lg: { paddingVertical: 16, fontSize: FONT_SIZE.lg, height: 52 },
 };
 
 export function Button({
@@ -62,67 +38,104 @@ export function Button({
   onPress,
   variant = 'primary',
   size = 'md',
-  loading = false,
   disabled = false,
-  icon,
+  loading = false,
   style,
+  textStyle,
+  icon,
+  iconPosition = 'left',
+  fullWidth = true,
 }: ButtonProps) {
-  const config = VARIANT_STYLES[variant];
-  const sizeConfig = SIZE_STYLES[size];
-  const isOutline = variant === 'outline';
-  const isGhost = variant === 'ghost';
+  const config = SIZE_CONFIG[size];
 
-  const getStyle = ({ pressed }: PressableStateCallbackType): StyleProp<ViewStyle> => [
-    {
+  const getContainerStyle = (): ViewStyle => {
+    const base: ViewStyle = {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 20,
-      gap: 8,
-      backgroundColor: pressed ? config.pressedBg : config.bg,
-      paddingVertical: sizeConfig.paddingVertical,
-      paddingHorizontal: sizeConfig.paddingHorizontal,
-      opacity: disabled || loading ? 0.5 : 1,
-    },
-    isOutline && {
-      borderWidth: 2,
-      borderColor: '#E2E8F0',
-    } as ViewStyle,
-    !isOutline && !isGhost && {
-      shadowColor: config.shadow,
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.3,
-      shadowRadius: 18,
-      elevation: 6,
-    } as ViewStyle,
-    style,
-  ];
+      borderRadius: RADIUS.full,
+      height: config.height,
+      paddingVertical: config.paddingVertical,
+      paddingHorizontal: 20,
+      opacity: disabled ? 0.5 : 1,
+    };
+
+    switch (variant) {
+      case 'primary':
+        return {
+          ...base,
+          backgroundColor: COLORS.greenCta,
+          ...SHADOWS.md,
+        };
+      case 'secondary':
+        return {
+          ...base,
+          backgroundColor: COLORS.white,
+          borderWidth: 1,
+          borderColor: COLORS.borderLight,
+        };
+      case 'outline':
+        return {
+          ...base,
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderColor: COLORS.greenCta,
+        };
+      case 'ghost':
+        return {
+          ...base,
+          backgroundColor: 'transparent',
+        };
+    }
+  };
+
+  const getTextStyle = (): TextStyle => {
+    const base: TextStyle = {
+      fontSize: config.fontSize,
+      fontWeight: FONT_WEIGHT.bold,
+      textAlign: 'center',
+    };
+
+    switch (variant) {
+      case 'primary':
+        return { ...base, color: COLORS.white };
+      case 'secondary':
+        return { ...base, color: COLORS.textDark };
+      case 'outline':
+      case 'ghost':
+        return { ...base, color: COLORS.greenCta };
+    }
+  };
+
+  const renderContent = () => {
+    if (loading) {
+      return <ActivityIndicator color={variant === 'primary' ? COLORS.white : COLORS.greenCta} />;
+    }
+
+    const iconElement = icon ? <>{icon}{' '}</> : null;
+
+    return (
+      <>
+        {icon && iconPosition === 'left' && iconElement}
+        <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+        {icon && iconPosition === 'right' && iconElement}
+      </>
+    );
+  };
 
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
-      style={getStyle}
+      style={({ pressed }) => [
+        getContainerStyle(),
+        { width: fullWidth ? '100%' : 'auto' },
+        pressed && !disabled && !loading ? { opacity: 0.85 } : {},
+        style,
+      ]}
+      android_ripple={{ color: 'rgba(255,255,255,0.15)' }}
     >
-      {loading ? (
-        <ActivityIndicator color={isOutline || isGhost ? COLORS.charcoal : COLORS.white} />
-      ) : (
-        <>
-          {icon && <Text style={{ fontSize: 18 }}>{icon}</Text>}
-          <Text
-            style={{
-              fontSize: sizeConfig.fontSize,
-              fontWeight: '800',
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              color: config.text,
-            }}
-          >
-            {title}
-          </Text>
-        </>
-      )}
+      {renderContent()}
     </Pressable>
   );
 }
-

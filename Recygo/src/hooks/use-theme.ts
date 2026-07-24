@@ -15,6 +15,9 @@ export const Colors = {
     card: '#FFFFFF',
     error: '#EF4444',
     success: '#2ECC71',
+    backgroundElement: '#F8F9F9',
+    backgroundSelected: '#E9F8EF',
+    tint: '#2ECC71',
   },
   dark: {
     green: '#2ECC71',
@@ -30,6 +33,9 @@ export const Colors = {
     card: '#1E293B',
     error: '#F87171',
     success: '#34D399',
+    backgroundElement: '#0F172A',
+    backgroundSelected: '#E9F8EF',
+    tint: '#2ECC71',
   },
 };
 
@@ -38,4 +44,3 @@ export function useTheme() {
   const scheme = colorScheme === 'dark' ? 'dark' : 'light';
   return Colors[scheme];
 }
-

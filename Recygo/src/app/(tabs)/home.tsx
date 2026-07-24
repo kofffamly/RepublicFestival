@@ -3,13 +3,13 @@
  *
  * Écran d'accueil pour le profil "Citoyen" avec :
  * - En-tête vert foncé (~30% hauteur) :
- *   - "Bonjour Aya" + cloche notifications + avatar "AK"
+ *   - "Bonjour Aya" + cloche notifications (point rouge si non lues) + avatar "AK"
  *   - 3 mini-cartes stats : CO2 évité (42kg), Recyclé (20kg), Revenus (3 092 F)
  * - Corps blanc qui remonte sur l'en-tête (radius haut 24px) :
  *   - Grande carte "Scanner un déchet" (icône caméra, titre, flèche)
- *   - 3 boutons accès rapide (Mes collectes, Recycleurs proches, Portefeuille)
+ *   - 3 boutons accès rapide cliquables (Mes collectes, Recycleurs proches, Portefeuille)
  *   - "Recycleurs à proximité" horizontal scroll
- *   - "Collectes récentes"
+ *   - "Collectes récentes" + lien "Historique"
  * - Barre navigation inférieure (5 items, bouton central flottant scanner)
  */
 
@@ -31,15 +31,12 @@ import { useApp } from '@/context/AppContext';
 const GREEN_DARK = '#0F5C34';
 const GREEN_MID = '#1E7A46';
 const GREEN_CTA = '#2ECC71';
-const GREEN_LIGHT = '#22C55E';
 const WHITE = '#FFFFFF';
 const TEXT_DARK = '#111827';
 const TEXT_GRAY = '#6B7280';
 const BG_LIGHT = '#F8FAFC';
-const CARD_BG = '#FFFFFF';
 
 const { width } = Dimensions.get('window');
-const STAT_CARD_WIDTH = (width - 48 - 16) / 3;
 
 // ─── Données mock ───────────────────────────────────────────────────
 const STATS = [
@@ -49,9 +46,9 @@ const STATS = [
 ];
 
 const QUICK_ACTIONS = [
-  { icon: '📦', label: 'Mes collectes', color: '#3B82F6', bg: '#EFF6FF' },
-  { icon: '📍', label: 'Recycleurs\nproches', color: '#8B5CF6', bg: '#F5F3FF' },
-  { icon: '👛', label: 'Portefeuille', color: '#EAB308', bg: '#FEFCE8' },
+  { icon: '📦', label: 'Mes collectes', route: '/(tabs)/history', color: '#3B82F6', bg: '#EFF6FF' },
+  { icon: '📍', label: 'Recycleurs\nproches', route: '/(citizen)/tracking', color: '#8B5CF6', bg: '#F5F3FF' },
+  { icon: '👛', label: 'Portefeuille', route: '/(tabs)/wallet', color: '#EAB308', bg: '#FEFCE8' },
 ];
 
 const RECYCLERS = [
@@ -139,7 +136,7 @@ function CollectionCard({ item }: { item: typeof RECENT_COLLECTIONS[0] }) {
 // ─── Écran principal ────────────────────────────────────────────────
 export default function CitizenHome() {
   const router = useRouter();
-  const { user } = useApp();
+  const { user, unreadCount } = useApp();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
 
@@ -168,7 +165,7 @@ export default function CitizenHome() {
             <View style={styles.headerActions}>
               <Pressable onPress={() => router.push('/(citizen)/notifications')} style={styles.notifBell}>
                 <Text style={styles.notifIcon}>🔔</Text>
-                <View style={styles.notifDot} />
+                {unreadCount > 0 && <View style={styles.notifDot} />}
               </Pressable>
               <View style={styles.avatarCircle}>
                 <Text style={styles.avatarText}>{initials}</Text>
@@ -214,7 +211,7 @@ export default function CitizenHome() {
           <AnimatedView delay={200}>
             <View style={styles.quickActionsRow}>
               {QUICK_ACTIONS.map((action, idx) => (
-                <AnimatedPressable key={idx}>
+                <AnimatedPressable key={idx} onPress={() => router.push(action.route as any)}>
                   <View style={[styles.quickActionCard, { backgroundColor: action.bg }]}>
                     <View style={[styles.quickActionIconBox, { backgroundColor: action.color + '20' }]}>
                       <Text style={styles.quickActionIcon}>{action.icon}</Text>
@@ -230,7 +227,7 @@ export default function CitizenHome() {
           <AnimatedView delay={250}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Recycleurs à proximité</Text>
-              <Pressable>
+              <Pressable onPress={() => router.push('/(citizen)/tracking')}>
                 <Text style={styles.seeAllLink}>Voir tout</Text>
               </Pressable>
             </View>
@@ -250,7 +247,7 @@ export default function CitizenHome() {
           <AnimatedView delay={300}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Collectes récentes</Text>
-              <Pressable>
+              <Pressable onPress={() => router.push('/(tabs)/history')}>
                 <Text style={styles.seeAllLink}>Historique</Text>
               </Pressable>
             </View>
@@ -616,4 +613,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

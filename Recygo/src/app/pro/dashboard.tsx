@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   proHeaderGrid: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.05,
     backgroundColor: 'transparent',
   },

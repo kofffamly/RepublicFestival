@@ -136,7 +136,7 @@ export default function Camera() {
   const handleCapture = () => {
     setCaptured(true);
     setTimeout(() => {
-      router.replace('/analyse' as any);
+      router.replace('/analyse');
     }, 700);
   };
 

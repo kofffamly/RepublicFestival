@@ -7,20 +7,11 @@
  * - Profil : icône personne
  */
 
-import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
+import { Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// ─── Constantes de design ───────────────────────────────────────────
-const GREEN_CTA = '#2ECC71';
-const GREEN_MID = '#1E7A46';
-const WHITE = '#FFFFFF';
-const INACTIVE = '#9CA3AF';
-const TAB_BAR_HEIGHT = 65;
-
-// ─── Constantes de couleur pour les icônes ─────────────────────────
-const ACTIVE_COLOR = GREEN_CTA;
-const INACTIVE_COLOR = INACTIVE;
+import { COLORS, TAB_BAR } from '@/constants/theme';
 
 // ─── Composant d'icône Tab ──────────────────────────────────────────
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
@@ -31,7 +22,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
     profile: '👤',
   };
   return (
-    <Text style={{ fontSize: 22, color: focused ? ACTIVE_COLOR : INACTIVE_COLOR, lineHeight: 26 }}>
+    <Text style={{ fontSize: 22, color: focused ? COLORS.greenCta : COLORS.textMuted, lineHeight: 26 }}>
       {iconMap[name] || '📄'}
     </Text>
   );
@@ -46,6 +37,7 @@ function ScannerButton({ onPress }: { onPress?: () => void }) {
         styles.scannerButton,
         { transform: [{ scale: pressed ? 0.92 : 1 }] },
       ]}
+      android_ripple={{ color: 'rgba(255,255,255,0.2)', radius: 30 }}
     >
       <Text style={styles.scannerIcon}>📷</Text>
     </Pressable>
@@ -55,20 +47,21 @@ function ScannerButton({ onPress }: { onPress?: () => void }) {
 // ─── Layout des Tabs ────────────────────────────────────────────────
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: GREEN_CTA,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarActiveTintColor: COLORS.greenCta,
+        tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
-          backgroundColor: WHITE,
+          backgroundColor: COLORS.white,
           borderTopWidth: 0,
-          borderTopColor: '#E5E7EB',
+          borderTopColor: COLORS.borderLight,
           paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
-          height: TAB_BAR_HEIGHT + Math.max(insets.bottom - 8, 0),
+          height: TAB_BAR.height + Math.max(insets.bottom - 8, 0),
           elevation: 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -101,7 +94,9 @@ export default function TabLayout() {
         name="camera-placeholder"
         options={{
           title: '',
-          tabBarButton: (props) => <ScannerButton onPress={() => {}} />,
+          tabBarButton: () => (
+            <ScannerButton onPress={() => router.push('/camera')} />
+          ),
           tabBarIcon: () => null,
         }}
       />
@@ -129,21 +124,20 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: GREEN_CTA,
+    backgroundColor: COLORS.greenCta,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -20,
-    shadowColor: GREEN_CTA,
+    shadowColor: COLORS.greenCta,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 8,
     borderWidth: 3,
-    borderColor: WHITE,
+    borderColor: COLORS.white,
   },
   scannerIcon: {
     fontSize: 24,
-    color: WHITE,
+    color: COLORS.white,
   },
 });
-

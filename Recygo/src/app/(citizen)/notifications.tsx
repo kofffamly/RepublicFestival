@@ -4,7 +4,9 @@
  * Écran de liste de notifications avec :
  * - Titre "Notifications" en noir gras + lien "Tout lire" en vert
  * - Liste de cartes de notification (icône ronde, titre, sous-titre, heure, point "non lu")
- * - 4 notifications mock : Collecte terminée, Recycleur en route, Notez votre expérience, Impact ce mois
+ * - Notifications depuis le contexte avec état lu/non lu
+ * - "Tout lire" marque toutes les notifications comme lues
+ * - Cliquer sur une notification la marque comme lue
  */
 
 import { useRef, useEffect } from 'react';
@@ -18,62 +20,14 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useApp } from '@/context/AppContext';
 
 // ─── Constantes de design ───────────────────────────────────────────
 const GREEN_CTA = '#2ECC71';
-const GREEN_DARK = '#0F5C34';
 const TEXT_DARK = '#111827';
 const TEXT_GRAY = '#6B7280';
 const BG_LIGHT = '#F8FAFC';
 const WHITE = '#FFFFFF';
-
-// ─── Données mock ───────────────────────────────────────────────────
-const NOTIFICATIONS = [
-  {
-    id: '1',
-    icon: '✓',
-    iconBg: '#E9F8EF',
-    iconColor: GREEN_CTA,
-    title: 'Collecte terminée !',
-    titleColor: GREEN_CTA,
-    subtitle: "Ibrahim a collecté vos déchets. 812 FCFA crédités.",
-    time: 'Il y a 5 min',
-    unread: true,
-  },
-  {
-    id: '2',
-    icon: '🚛',
-    iconBg: '#EFF6FF',
-    iconColor: '#3B82F6',
-    title: 'Recycleur en route',
-    titleColor: '#3B82F6',
-    subtitle: "Ibrahim Coulibaly arrive dans 12 minutes.",
-    time: 'Il y a 12 min',
-    unread: true,
-  },
-  {
-    id: '3',
-    icon: '⭐',
-    iconBg: '#FEF3C7',
-    iconColor: '#F5A524',
-    title: 'Notez votre expérience',
-    titleColor: TEXT_DARK,
-    subtitle: "Comment s'est passée votre collecte du 18 juil. ?",
-    time: 'Hier',
-    unread: false,
-  },
-  {
-    id: '4',
-    icon: '♻️',
-    iconBg: '#E9F8EF',
-    iconColor: GREEN_CTA,
-    title: 'Impact ce mois',
-    titleColor: GREEN_CTA,
-    subtitle: "Vous avez évité 42 kg de CO2 ce mois-ci. Bravo !",
-    time: 'Il y a 3 j',
-    unread: false,
-  },
-];
 
 // ─── Composant d'animation ──────────────────────────────────────────
 function AnimatedView({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: any }) {
@@ -93,7 +47,19 @@ function AnimatedView({ children, delay = 0, style }: { children: React.ReactNod
 // ─── Écran Notifications ────────────────────────────────────────────
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { notifications, markAllNotificationsRead, markNotificationRead, unreadCount } = useApp();
   const insets = useSafeAreaInsets();
+
+  const handleMarkAllRead = () => {
+    markAllNotificationsRead();
+  };
+
+  const handleNotificationPress = (id: string, action?: string) => {
+    markNotificationRead(id);
+    if (action) {
+      router.push(action as any);
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -103,9 +69,13 @@ export default function NotificationsScreen() {
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <Pressable>
-          <Text style={styles.markAllRead}>Tout lire</Text>
-        </Pressable>
+        {unreadCount > 0 ? (
+          <Pressable onPress={handleMarkAllRead}>
+            <Text style={styles.markAllRead}>Tout lire</Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 60 }} />
+        )}
       </AnimatedView>
 
       <ScrollView
@@ -113,26 +83,39 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {NOTIFICATIONS.map((notif, idx) => (
-          <AnimatedView key={notif.id} delay={100 + idx * 80}>
-            <View style={styles.notifCard}>
-              {/* Point non lu */}
-              {notif.unread && <View style={styles.unreadDot} />}
+        {notifications.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>🔔</Text>
+            <Text style={styles.emptyTitle}>Aucune notification</Text>
+            <Text style={styles.emptySubtitle}>Vous serez notifié(e) lorsqu’un événement se produit.</Text>
+          </View>
+        ) : (
+          notifications.map((notif, idx) => (
+            <AnimatedView key={notif.id} delay={100 + idx * 80}>
+              <Pressable
+                onPress={() => handleNotificationPress(notif.id, notif.action)}
+                style={styles.pressableWrapper}
+              >
+                <View style={[styles.notifCard, !notif.unread && styles.notifCardRead]}>
+                  {/* Point non lu */}
+                  {notif.unread && <View style={styles.unreadDot} />}
 
-              {/* Icône */}
-              <View style={[styles.notifIconBox, { backgroundColor: notif.iconBg }]}>
-                <Text style={[styles.notifIcon, { color: notif.iconColor }]}>{notif.icon}</Text>
-              </View>
+                  {/* Icône */}
+                  <View style={[styles.notifIconBox, { backgroundColor: notif.iconBg }]}>
+                    <Text style={[styles.notifIcon, { color: notif.iconColor }]}>{notif.icon}</Text>
+                  </View>
 
-              {/* Contenu */}
-              <View style={styles.notifContent}>
-                <Text style={[styles.notifTitle, { color: notif.titleColor }]}>{notif.title}</Text>
-                <Text style={styles.notifSubtitle} numberOfLines={2}>{notif.subtitle}</Text>
-                <Text style={styles.notifTime}>{notif.time}</Text>
-              </View>
-            </View>
-          </AnimatedView>
-        ))}
+                  {/* Contenu */}
+                  <View style={styles.notifContent}>
+                    <Text style={[styles.notifTitle, { color: notif.titleColor }]}>{notif.title}</Text>
+                    <Text style={styles.notifSubtitle} numberOfLines={2}>{notif.subtitle}</Text>
+                    <Text style={styles.notifTime}>{notif.time}</Text>
+                  </View>
+                </View>
+              </Pressable>
+            </AnimatedView>
+          ))
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -192,6 +175,10 @@ const styles = StyleSheet.create({
   },
 
   // ── Carte notification ──
+  pressableWrapper: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
   notifCard: {
     flexDirection: 'row',
     backgroundColor: WHITE,
@@ -203,6 +190,9 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
     position: 'relative',
+  },
+  notifCardRead: {
+    opacity: 0.7,
   },
   unreadDot: {
     position: 'absolute',
@@ -245,5 +235,26 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#9CA3AF',
   },
-});
 
+  // ── Empty state ──
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: TEXT_GRAY,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+});
