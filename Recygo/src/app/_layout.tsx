@@ -20,6 +20,7 @@ export default function RootLayout() {
           <Stack.Screen name="argent" />
           <Stack.Screen name="explore" />
           <Stack.Screen name="pro" />
+          <Stack.Screen name="assistant" />
         </Stack>
       </AppProvider>
     </SafeAreaProvider>
