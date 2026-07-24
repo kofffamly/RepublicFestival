@@ -69,43 +69,65 @@ export async function registerUser(
   role: Role = 'citizen',
   phone?: string
 ): Promise<FirebaseUser> {
-  // 1. Créer l'utilisateur Firebase Auth
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  const firebaseUser = userCredential.user;
+  try {
+    // 1. Créer l'utilisateur Firebase Auth
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const firebaseUser = userCredential.user;
 
-  // 2. Mettre à jour le displayName dans Auth
-  await updateProfile(firebaseUser, { displayName });
+    // 2. Mettre à jour le displayName dans Auth
+    await updateProfile(firebaseUser, { displayName });
 
-  // 3. Créer le document Firestore
-  const userData: Omit<UserProfile, 'createdAt' | 'updatedAt'> = {
-    uid: firebaseUser.uid,
-    email: firebaseUser.email || email,
-    displayName,
-    phone: phone || '',
-    role,
-    collections: 0,
-    recycledKg: 0,
-    earnings: 0,
-    language: 'fr',
-    notificationsEnabled: true,
-    theme: 'light',
-  };
+    // 3. Créer le document Firestore
+    const userData: Omit<UserProfile, 'createdAt' | 'updatedAt'> = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email || email,
+      displayName,
+      phone: phone || '',
+      role,
+      collections: 0,
+      recycledKg: 0,
+      earnings: 0,
+      language: 'fr',
+      notificationsEnabled: true,
+      theme: 'light',
+    };
 
-  await setDoc(doc(db, 'users', firebaseUser.uid), {
-    ...userData,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+    await setDoc(doc(db, 'users', firebaseUser.uid), {
+      ...userData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
 
-  return firebaseUser;
+    return firebaseUser;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('email-already-in-use')) {
+      throw new Error('Email déjà utilisé');
+    }
+    if (message.includes('weak-password')) {
+      throw new Error('Mot de passe trop faible (min 6 caractères)');
+    }
+    if (message.includes('auth/configuration-not-found')) {
+      throw new Error('Firebase Auth Email/Password n’est pas configuré pour ce projet. Activez le provider Email/Password dans Firebase Console.');
+    }
+    throw err;
+  }
 }
 
 /**
  * Connexion avec email + mot de passe
  */
 export async function loginUser(email: string, password: string): Promise<FirebaseUser> {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  return userCredential.user;
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('auth/configuration-not-found')) {
+      throw new Error('Firebase Auth Email/Password n’est pas configuré pour ce projet. Activez le provider Email/Password dans Firebase Console.');
+    }
+    throw err;
+  }
 }
 
 /**

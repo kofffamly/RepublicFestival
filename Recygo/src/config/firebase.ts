@@ -4,8 +4,11 @@
  * Centralise l'initialisation Firebase pour toute l'application.
  * Utilise les variables d'environnement Expo (EXPO_PUBLIC_*).
  * Aucune valeur codée en dur — les variables doivent être définies
- * dans le fichier .env.local ou l'environnement de déploiement.
+ * dans le fichier .env ou l'environnement de déploiement.
  */
+
+import Constants from 'expo-constants';
+import type { FirebaseOptions } from 'firebase/app';
 
 // ─── Variables d'environnement requises ─────────────────────────────
 const REQUIRED_KEYS = [
@@ -18,15 +21,19 @@ const REQUIRED_KEYS = [
 ] as const;
 
 // ─── Validation au chargement ───────────────────────────────────────
-import type { FirebaseOptions } from 'firebase/app';
 
-const missingKeys = REQUIRED_KEYS.filter((key) => !process.env[key]);
+const runtimeEnv = {
+  ...Constants.expoConfig?.extra,
+  ...process.env,
+};
+
+const missingKeys = REQUIRED_KEYS.filter((key) => !runtimeEnv[key]);
 
 // If running with the local Firebase emulator, allow missing production keys
 // so the app can run for local demos. Production builds should still provide
 // the real keys — this guard only activates when EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true'.
-const USE_FIREBASE_EMULATOR = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
-const USE_DEMO_MODE = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+const USE_FIREBASE_EMULATOR = runtimeEnv.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+const USE_DEMO_MODE = runtimeEnv.EXPO_PUBLIC_DEMO_MODE === 'true';
 
 if (USE_DEMO_MODE && !USE_FIREBASE_EMULATOR) {
   throw new Error(
@@ -65,15 +72,15 @@ if (missingKeys.length > 0 && !USE_FIREBASE_EMULATOR) {
 
 // ─── Configuration ──────────────────────────────────────────────────
 const FIREBASE_CONFIG: FirebaseOptions = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
+  apiKey: runtimeEnv.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: runtimeEnv.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: runtimeEnv.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket:
-    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    `${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.appspot.com`,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    runtimeEnv.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    `${runtimeEnv.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.appspot.com`,
+  messagingSenderId: runtimeEnv.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: runtimeEnv.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: runtimeEnv.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 export default FIREBASE_CONFIG;

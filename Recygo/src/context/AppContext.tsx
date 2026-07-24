@@ -282,7 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (m.includes('email-already-in-use')) setError('Email déjà utilisé');
       else if (m.includes('weak-password')) setError('Mot de passe trop faible (min 6 car.)');
       else if (m.includes('configuration-not-found')) {
-        setError('Firebase Auth configuration introuvable. Vérifiez vos variables d’environnement et les identifiants du projet.');
+        setError('Firebase Auth Email/Password n’est pas configuré dans le projet. Activez le provider Email/Password dans Firebase Console.');
       } else setError(m);
       throw err;
     }
