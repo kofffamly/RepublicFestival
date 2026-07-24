@@ -84,15 +84,19 @@ export default function ProfileScreen() {
   const { user, logout } = useApp();
   const insets = useSafeAreaInsets();
 
-  const initials = user?.name
-    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'AK'
-    : 'AK';
+  // Initiales depuis displayName (données Firestore)
+  const displayName = user?.displayName || '';
+  const initials = displayName
+    ? displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '';
 
-  const displayName = user?.name || 'Aya Kouassi';
-  const displayEmail = user?.email || user?.phone
-    ? `${user.name?.toLowerCase().replace(/\s/g, '.')}@example.com`
-    : 'aya.kouassi@example.com';
-  const displayMemberSince = user?.memberSince || 'mai 2025';
+  // Email depuis Firestore
+  const displayEmail = user?.email || '';
+
+  // Membre depuis : formatte la date de création
+  const displayMemberSince = user?.createdAt
+    ? user.createdAt.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    : '';
 
   const handleMenuPress = (item: typeof MENU_ITEMS[0]) => {
     if (item.label === 'Déconnexion') {
@@ -123,14 +127,14 @@ export default function ProfileScreen() {
           {/* Avatar */}
           <AnimatedView delay={100} style={styles.avatarSection}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{initials}</Text>
+              <Text style={styles.avatarText}>{initials || '?'}</Text>
             </View>
-            <Text style={styles.userName}>{displayName}</Text>
-            <Text style={styles.userEmail}>{displayEmail}</Text>
+            <Text style={styles.userName}>{displayName || ''}</Text>
+            <Text style={styles.userEmail}>{displayEmail || ''}</Text>
 
             {/* Badge membre */}
             <View style={styles.badgePill}>
-              <Text style={styles.badgeText}>Membre depuis {displayMemberSince}</Text>
+              <Text style={styles.badgeText}>Membre depuis {displayMemberSince || '—'}</Text>
             </View>
           </AnimatedView>
 
@@ -138,17 +142,17 @@ export default function ProfileScreen() {
           <AnimatedView delay={150}>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{user?.collections ?? 5}</Text>
+                <Text style={styles.statValue}>{user?.collections ?? 0}</Text>
                 <Text style={styles.statLabel}>Collectes</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{user?.recycledKg ?? 20} kg</Text>
+                <Text style={styles.statValue}>{user?.recycledKg ?? 0} kg</Text>
                 <Text style={styles.statLabel}>Recyclé</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{user?.earnings ?? 3092} F</Text>
+                <Text style={styles.statValue}>{user?.earnings ?? 0} F</Text>
                 <Text style={styles.statLabel}>Revenus</Text>
               </View>
             </View>

@@ -36,17 +36,24 @@ export default function PersonalInfoScreen() {
   const { user } = useApp();
   const insets = useSafeAreaInsets();
 
-  const initials = user?.name
-    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'AK'
-    : 'AK';
+  // Initiales depuis displayName (données Firestore)
+  const displayName = user?.displayName || '';
+  const initials = displayName
+    ? displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '';
+
+  // Membre depuis : formatte la date de création
+  const memberSince = user?.createdAt
+    ? user.createdAt.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    : '';
 
   const infoItems = [
-    { icon: '📱', label: 'Téléphone', value: user?.phone || '+225 07 00 00 00', route: '/(citizen)/personal-info' },
-    { icon: '📧', label: 'Email', value: user?.email || 'aya.kouassi@example.com', route: '/(citizen)/personal-info' },
-    { icon: '📅', label: 'Membre depuis', value: user?.memberSince || 'mai 2025', route: '/(citizen)/personal-info' },
-    { icon: '📍', label: 'Adresse', value: user?.address || 'Abidjan, Côte d\'Ivoire', route: '/(citizen)/personal-info' },
-    { icon: '♻️', label: 'Total collecté', value: `${user?.recycledKg ?? 20} kg`, route: '/(citizen)/personal-info' },
-    { icon: '💰', label: 'Total gagné', value: `${user?.earnings ?? 3092} FCFA`, route: '/(citizen)/personal-info' },
+    { icon: '📱', label: 'Téléphone', value: user?.phone || '', route: '/(citizen)/personal-info' },
+    { icon: '📧', label: 'Email', value: user?.email || '', route: '/(citizen)/personal-info' },
+    { icon: '📅', label: 'Membre depuis', value: memberSince || '', route: '/(citizen)/personal-info' },
+    { icon: '📍', label: 'Adresse', value: user?.address || '', route: '/(citizen)/personal-info' },
+    { icon: '♻️', label: 'Total collecté', value: `${user?.recycledKg ?? 0} kg`, route: '/(citizen)/personal-info' },
+    { icon: '💰', label: 'Total gagné', value: `${user?.earnings ?? 0} FCFA`, route: '/(citizen)/personal-info' },
   ];
 
   return (
@@ -71,10 +78,10 @@ export default function PersonalInfoScreen() {
           {/* Carte Avatar + Nom */}
           <View style={styles.avatarCard}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{initials}</Text>
+              <Text style={styles.avatarText}>{initials || '?'}</Text>
             </View>
-            <Text style={styles.userName}>{user?.name || 'Aya Kouassi'}</Text>
-            <Text style={styles.userEmail}>{user?.email || 'aya.kouassi@example.com'}</Text>
+            <Text style={styles.userName}>{displayName || ''}</Text>
+            <Text style={styles.userEmail}>{user?.email || ''}</Text>
           </View>
 
           {/* Liste des informations */}
@@ -90,7 +97,7 @@ export default function PersonalInfoScreen() {
                   </View>
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>{item.label}</Text>
-                    <Text style={styles.infoValue}>{item.value}</Text>
+                    <Text style={styles.infoValue}>{item.value || '—'}</Text>
                   </View>
                   <Text style={styles.infoArrow}>›</Text>
                 </Pressable>

@@ -1,4 +1,4 @@
-/**
+  /**
  * Inscription — "Créer un compte" — RecyGo CI
  *
  * Écran d'inscription avec :
@@ -32,7 +32,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useApp, Role } from '@/context/AppContext';
+import { useApp, UserRole } from '@/context/AppContext';
 
 // ─── Constantes de design ───────────────────────────────────────────
 const GREEN_DARK = '#0F5C34';
@@ -144,7 +144,7 @@ function FormField({
 export default function Register() {
   const router = useRouter();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
-  const { login, setRole } = useApp();
+  const { register } = useApp();
   const insets = useSafeAreaInsets();
 
   // États des champs
@@ -158,7 +158,7 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const role = (roleParam as Role) || 'citizen';
+  const role = (roleParam as UserRole) || 'citizen';
 
   // ── Formatage téléphone ───────────────────────────────────────────
   const handlePhoneChange = (text: string) => {
@@ -188,18 +188,20 @@ export default function Register() {
     setError('');
     setIsLoading(true);
 
-    // Simule une latence réseau
-    setTimeout(() => {
-      const mockUser = {
-        name: fullName.trim(),
-        phone: `+225 ${phone}`,
-        role,
-      };
-      login(mockUser);
-      setRole(role);
-      setIsLoading(false);
+    try {
+      // Formatage du téléphone avec le préfixe Côte d'Ivoire
+      const formattedPhone = `+225 ${phone}`;
+
+      // Inscription réelle via Firebase Auth + Firestore
+      await register(email.trim(), password, fullName.trim(), role, formattedPhone);
+
       router.replace('/(tabs)/home');
-    }, 1200);
+    } catch (e: unknown) {
+      // L'erreur est déjà gérée dans le contexte (setError)
+      // Récupère le message d'erreur du contexte
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -538,4 +540,3 @@ const styles = StyleSheet.create({
     color: GREEN_CTA,
   },
 });
-

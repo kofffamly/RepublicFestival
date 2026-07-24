@@ -5,7 +5,10 @@
  * et les données globales à toute l'application.
  *
  * Utilise Firebase Auth pour l'authentification et Firestore
- * en temps réel pour le profil utilisateur.
+ * en temps réel pour le profil utilisateur et les notifications.
+ *
+ * Chaque utilisateur possède un document Firestore unique lié à son UID.
+ * Aucune donnée n'est mélangée entre utilisateurs.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
@@ -17,7 +20,21 @@ import {
   onAuthStateChanged,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, updateDoc, serverTimestamp, type DocumentSnapshot, type Timestamp } from 'firebase/firestore';
+import {
+  doc,
+  onSnapshot,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+  type DocumentSnapshot,
+  type Timestamp,
+  query,
+  collection,
+  where,
+  orderBy,
+  writeBatch,
+  getDocs,
+} from 'firebase/firestore';
 import { auth, db } from '@/firebase';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -46,9 +63,16 @@ export interface AppNotification {
   id: string;
   title: string;
   message: string;
+  subtitle?: string;
   type: 'info' | 'success' | 'warning' | 'reward';
   read: boolean;
   createdAt: Date;
+  action?: string;
+  icon?: string;
+  iconBg?: string;
+  iconColor?: string;
+  titleColor?: string;
+  time?: string;
 }
 
 interface AppContextValue {
@@ -56,36 +80,22 @@ interface AppContextValue {
   isAuthenticated: boolean;
   firebaseUser: FirebaseUser | null;
   user: UserData | null;
+  balance: number;
   notifications: AppNotification[];
   unreadCount: number;
   login: (email: string, password: string) => Promise<FirebaseUser>;
   register: (email: string, password: string, displayName: string, role: UserRole, phone?: string) => Promise<FirebaseUser>;
   logout: () => Promise<void>;
   updateUserProfile: (data: Partial<UserData>) => Promise<void>;
+  setRole: (role: UserRole) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
   error: string | null;
 }
 
 // ─── Contexte ──────────────────────────────────────────────────────
 
 const AppContext = createContext<AppContextValue | null>(null);
-
-const DEFAULT_USER: UserData = {
-  uid: '',
-  email: '',
-  displayName: '',
-  phone: '',
-  photoURL: '',
-  role: 'citizen',
-  address: '',
-  collections: 0,
-  recycledKg: 0,
-  earnings: 0,
-  language: 'fr',
-  notificationsEnabled: true,
-  theme: 'light',
-  createdAt: null,
-  updatedAt: null,
-};
 
 // ─── Provider ──────────────────────────────────────────────────────
 
@@ -107,6 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (unsubFirestore) unsubFirestore();
         if (unsubNotif) unsubNotif();
 
+        // ─── Écoute du document utilisateur (UID comme ID) ────────
         const userRef = doc(db, 'users', fbUser.uid);
         unsubFirestore = onSnapshot(
           userRef,
@@ -117,7 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               const ua = d.updatedAt as Timestamp | null;
               setUser({
                 uid: snapshot.id,
-                email: d.email || '',
+                email: d.email || fbUser.email || '',
                 displayName: d.displayName || fbUser.displayName || '',
                 phone: d.phone || '',
                 photoURL: d.photoURL || fbUser.photoURL || '',
@@ -133,32 +144,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 updatedAt: ua?.toDate() || null,
               });
             } else {
+              // Crée le document utilisateur s'il n'existe pas
+              // en utilisant uniquement les données de Firebase Auth
               setDoc(userRef, {
-                uid: fbUser.uid, email: fbUser.email || '', displayName: fbUser.displayName || '',
-                phone: '', photoURL: '', role: 'citizen', address: '',
-                collections: 0, recycledKg: 0, earnings: 0,
-                language: 'fr', notificationsEnabled: true, theme: 'light',
-                createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+                uid: fbUser.uid,
+                email: fbUser.email || '',
+                displayName: fbUser.displayName || '',
+                phone: '',
+                photoURL: '',
+                role: 'citizen',
+                address: '',
+                collections: 0,
+                recycledKg: 0,
+                earnings: 0,
+                language: 'fr',
+                notificationsEnabled: true,
+                theme: 'light',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
               }).catch(console.error);
             }
           },
-          (err) => { console.error("[AppContext] Firestore error:", err); }
+          (err) => { console.error('[AppContext] Firestore error:', err); }
         );
 
-        const notifRef = doc(db, 'notifications', fbUser.uid);
-        unsubNotif = onSnapshot(notifRef, (snap: DocumentSnapshot) => {
-          if (snap.exists()) {
-            const d = snap.data();
-            const list: AppNotification[] = (d.list || []).map((n: Record<string, unknown>, i: number) => ({
-              id: (n.id as string) || String(i),
-              title: (n.title as string) || '',
-              message: (n.message as string) || '',
-              type: (n.type as AppNotification['type']) || 'info',
-              read: (n.read as boolean) || false,
-              createdAt: ((n.createdAt as Timestamp)?.toDate()) || new Date(),
-            }));
-            setNotifications(list);
-          }
+        // ─── Écoute des notifications (documents individuels) ─────
+        const notifQuery = query(
+          collection(db, 'notifications'),
+          where('userId', '==', fbUser.uid),
+          orderBy('createdAt', 'desc')
+        );
+        unsubNotif = onSnapshot(notifQuery, (querySnapshot) => {
+          const list: AppNotification[] = [];
+          querySnapshot.forEach((docSnap) => {
+            const d = docSnap.data();
+            const ca = d.createdAt as Timestamp | null;
+            list.push({
+              id: docSnap.id,
+              title: d.title || '',
+              message: d.body || d.message || '',
+              subtitle: d.subtitle,
+              type: (d.type as AppNotification['type']) || 'info',
+              read: d.read ?? false,
+              createdAt: ca?.toDate() || new Date(),
+              action: d.actionUrl || d.action,
+              icon: d.icon,
+              iconBg: d.iconBg,
+              iconColor: d.iconColor,
+              titleColor: d.titleColor,
+              time: d.time,
+            });
+          });
+          setNotifications(list);
         });
       } else {
         setUser(null);
@@ -175,7 +212,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // ─── Valeurs dérivées ───────────────────────────────────────────
+
   const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  const balance = useMemo(() => user?.earnings ?? 0, [user?.earnings]);
+
+  // ─── Authentification ───────────────────────────────────────────
 
   const login = useCallback(async (email: string, password: string): Promise<FirebaseUser> => {
     setError(null);
@@ -184,9 +227,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return cred.user;
     } catch (err: unknown) {
       const m = err instanceof Error ? err.message : 'Erreur';
-      if (m.includes('user-not-found')) setError("Aucun compte trouvé");
-      else if (m.includes('wrong-password') || m.includes('invalid-credential')) setError("Email ou mot de passe incorrect");
-      else if (m.includes('too-many-requests')) setError("Trop de tentatives");
+      if (m.includes('user-not-found')) setError('Aucun compte trouvé');
+      else if (m.includes('wrong-password') || m.includes('invalid-credential')) setError('Email ou mot de passe incorrect');
+      else if (m.includes('too-many-requests')) setError('Trop de tentatives');
       else setError(m);
       throw err;
     }
@@ -197,19 +240,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   ): Promise<FirebaseUser> => {
     setError(null);
     try {
+      // 1. Crée l'utilisateur dans Firebase Auth
       const cred = await createUserWithEmailAndPassword(auth, email, password);
+
+      // 2. Met à jour le displayName dans Firebase Auth
       await updateProfile(cred.user, { displayName });
+
+      // 3. Crée le document Firestore avec UID comme identifiant
+      //    Uniquement les données réellement saisies + valeurs initiales
       await setDoc(doc(db, 'users', cred.user.uid), {
-        uid: cred.user.uid, email: email, displayName, phone: phone || '', photoURL: '',
-        role, address: '', collections: 0, recycledKg: 0, earnings: 0,
-        language: 'fr', notificationsEnabled: true, theme: 'light',
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        uid: cred.user.uid,
+        email: email,
+        displayName,
+        phone: phone || '',
+        photoURL: '',
+        role,
+        address: '',
+        collections: 0,
+        recycledKg: 0,
+        earnings: 0,
+        language: 'fr',
+        notificationsEnabled: true,
+        theme: 'light',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
+
       return cred.user;
     } catch (err: unknown) {
-      const m = err instanceof Error ? err.message : "Erreur";
-      if (m.includes('email-already-in-use')) setError("Email déjà utilisé");
-      else if (m.includes('weak-password')) setError("Mot de passe trop faible (min 6 car.)");
+      const m = err instanceof Error ? err.message : 'Erreur';
+      if (m.includes('email-already-in-use')) setError('Email déjà utilisé');
+      else if (m.includes('weak-password')) setError('Mot de passe trop faible (min 6 car.)');
       else setError(m);
       throw err;
     }
@@ -220,10 +281,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   }, []);
 
+  // ─── Mise à jour du profil ──────────────────────────────────────
+
   const updateUserProfile = useCallback(async (data: Partial<UserData>) => {
-    if (!firebaseUser) { setError("Non connecté"); return; }
+    if (!firebaseUser) {
+      setError('Non connecté');
+      return;
+    }
     try {
-      await updateDoc(doc(db, 'users', firebaseUser.uid), { ...data, updatedAt: serverTimestamp() });
+      // Met à jour Firebase Auth si displayName ou photoURL change
+      const authUpdates: { displayName?: string; photoURL?: string } = {};
+      if (data.displayName !== undefined) authUpdates.displayName = data.displayName;
+      if (data.photoURL !== undefined) authUpdates.photoURL = data.photoURL;
+      if (Object.keys(authUpdates).length > 0) {
+        await updateProfile(firebaseUser, authUpdates);
+      }
+
+      // Met à jour Firestore
+      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+        ...data,
+        updatedAt: serverTimestamp(),
+      });
     } catch (err: unknown) {
       const m = err instanceof Error ? err.message : 'Erreur';
       setError(m);
@@ -231,10 +309,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [firebaseUser]);
 
+  const setRole = useCallback(async (role: UserRole) => {
+    if (!firebaseUser) {
+      setError('Non connecté');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+        role,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err: unknown) {
+      const m = err instanceof Error ? err.message : 'Erreur';
+      setError(m);
+      throw err;
+    }
+  }, [firebaseUser]);
+
+  // ─── Notifications ──────────────────────────────────────────────
+
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!firebaseUser) return;
+    try {
+      const batch = writeBatch(db);
+      const notifQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', firebaseUser.uid),
+        where('read', '==', false)
+      );
+      const snapshot = await getDocs(notifQuery);
+      snapshot.forEach((docSnap) => {
+        batch.update(docSnap.ref, { read: true, readAt: serverTimestamp() });
+      });
+      await batch.commit();
+    } catch (err: unknown) {
+      console.error('[AppContext] markAllNotificationsRead error:', err);
+    }
+  }, [firebaseUser]);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    if (!firebaseUser) return;
+    try {
+      await updateDoc(doc(db, 'notifications', id), {
+        read: true,
+        readAt: serverTimestamp(),
+      });
+    } catch (err: unknown) {
+      console.error('[AppContext] markNotificationRead error:', err);
+    }
+  }, [firebaseUser]);
+
+  // ─── Valeur du contexte ─────────────────────────────────────────
+
   const value: AppContextValue = useMemo(() => ({
-    isLoading, isAuthenticated: !!firebaseUser, firebaseUser, user,
-    notifications, unreadCount, login, register, logout, updateUserProfile, error,
-  }), [isLoading, firebaseUser, user, notifications, unreadCount, login, register, logout, updateUserProfile, error]);
+    isLoading,
+    isAuthenticated: !!firebaseUser,
+    firebaseUser,
+    user,
+    balance,
+    notifications,
+    unreadCount,
+    login,
+    register,
+    logout,
+    updateUserProfile,
+    setRole,
+    markAllNotificationsRead,
+    markNotificationRead,
+    error,
+  }), [
+    isLoading, firebaseUser, user, balance, notifications, unreadCount,
+    login, register, logout, updateUserProfile, setRole,
+    markAllNotificationsRead, markNotificationRead, error,
+  ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
