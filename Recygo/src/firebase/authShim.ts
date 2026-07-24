@@ -23,7 +23,7 @@ function notifyAuthState() {
 
 export async function createUserWithEmailAndPassword(_auth: unknown, email: string, password: string) {
   // Simple in-memory user creation
-  const uid = uuidv4();
+  const uid = makeUid();
   users[email] = { uid, email, password, displayName: '' };
   currentUser = { uid, email, displayName: '' };
   notifyAuthState();
