@@ -8,10 +8,18 @@
  * - Suppression
  */
 
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import * as firestoreSDK from 'firebase/firestore';
+import * as authSDK from 'firebase/auth';
+import * as authShim from '@/firebase/authShim';
+import * as fsShim from '@/firebase/firestoreShim';
 import { auth, db } from '../firebase';
 
+const DEMO_MODE = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+
+// @ts-ignore
+const { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, onAuthStateChanged } = DEMO_MODE ? authShim as any : authSDK as any;
+// @ts-ignore
+const { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } = DEMO_MODE ? fsShim as any : firestoreSDK as any;
 // ═════════════════════════════════════════════════════════════════════
 // TYPES
 // ═════════════════════════════════════════════════════════════════════

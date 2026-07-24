@@ -12,30 +12,40 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import {
+import * as authSDK from 'firebase/auth';
+import * as firestoreSDK from 'firebase/firestore';
+import * as authShim from '@/firebase/authShim';
+import * as fsShim from '@/firebase/firestoreShim';
+import { auth, db } from '@/firebase';
+
+// Demo mode flag: use shims when emulator mode is enabled and demo fallback requested
+const DEMO_MODE = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+
+// Pick implementations (shims or real SDK)
+// @ts-ignore - selected bindings may differ between shim and SDK
+const {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
   onAuthStateChanged,
-  type User as FirebaseUser,
-} from 'firebase/auth';
-import {
+} = DEMO_MODE ? authShim : authSDK as any;
+
+// @ts-ignore
+const {
   doc,
   onSnapshot,
   setDoc,
   updateDoc,
   serverTimestamp,
-  type DocumentSnapshot,
-  type Timestamp,
+  // Types may differ — import types separately when needed
   query,
   collection,
   where,
   orderBy,
   writeBatch,
   getDocs,
-} from 'firebase/firestore';
-import { auth, db } from '@/firebase';
+} = DEMO_MODE ? fsShim as any : firestoreSDK as any;
 
 // ─── Types ──────────────────────────────────────────────────────────
 

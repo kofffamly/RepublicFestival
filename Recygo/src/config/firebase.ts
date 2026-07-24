@@ -20,7 +20,10 @@ const REQUIRED_KEYS = [
 // ─── Validation au chargement ───────────────────────────────────────
 const missingKeys = REQUIRED_KEYS.filter((key) => !process.env[key]);
 
-if (missingKeys.length > 0) {
+// If running with the local Firebase emulator, allow missing production keys
+// so the app can run for local demos. Production builds should still provide
+// the real keys — this guard only activates when EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true'.
+if (missingKeys.length > 0 && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR !== 'true') {
   const message = [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '❌  Configuration Firebase invalide — variables manquantes',
@@ -41,6 +44,11 @@ if (missingKeys.length > 0) {
 
   // Throw a clear error instead of the cryptic "auth/invalid-api-key"
   throw new Error(message);
+} else if (missingKeys.length > 0 && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+  // When using the emulator, log a clear warning and continue with placeholders.
+  // This keeps the app running for demos and local development.
+  // eslint-disable-next-line no-console
+  console.warn('[DEV_MODE] Firebase prod keys missing but emulator mode is enabled. Continuing with emulator settings.');
 }
 
 // ─── Configuration ──────────────────────────────────────────────────
