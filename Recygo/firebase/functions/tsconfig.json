@@ -14,16 +14,16 @@
     "declaration": true,
     "declarationMap": true,
     "rootDir": "src",
-    "types": ["node"],
+    "types": ["node", "jest"],
     "typeRoots": ["node_modules/@types"]
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.d.ts"
+    "src/**/*.d.ts",
+    "src/__tests__/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "lib",
-    "src/__tests__"
+    "lib"
   ]
 }
