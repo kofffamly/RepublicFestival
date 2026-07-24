@@ -39,10 +39,8 @@ import * as admin from 'firebase-admin';
 
 const ASSISTANT_TIMEOUT_MS = 25000;
 const MAX_MESSAGE_LENGTH = 2000;
-const MAX_HISTORY_TOKENS = 2000; // Tokens max pour l'historique
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 20;
-const CACHE_TTL_MS = 3600000; // 1 heure
 const MAX_HISTORY_MESSAGES = 10;
 
 // ═════════════════════════════════════════════════════════════════════
@@ -64,22 +62,6 @@ interface OffTopicResult {
 // ═════════════════════════════════════════════════════════════════════
 // AUTHENTIFICATION
 // ═════════════════════════════════════════════════════════════════════
-
-/**
- * Extrait et vérifie le token Bearer du header Authorization
- */
-function extractToken(authHeader: string | undefined): string {
-  if (!authHeader) {
-    throw new AuthError('Authentification requise', 'Header Authorization manquant');
-  }
-
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    throw new AuthError('Format de token invalide', 'Utilisez: Authorization: Bearer <token>');
-  }
-
-  return parts[1];
-}
 
 /**
  * Vérifie le token Firebase et retourne le contexte utilisateur

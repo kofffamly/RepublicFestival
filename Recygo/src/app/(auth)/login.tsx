@@ -83,6 +83,7 @@ export default function Login() {
                 <Text style={{ fontSize: 16, marginRight: 10, opacity: 0.6 }}>📧</Text>
                 <TextInput style={st.input} placeholder="aya.kouassi@example.com" placeholderTextColor="#9CA3AF" value={idf} onChangeText={setIdf} keyboardType="email-address" autoCapitalize="none" editable={!loading} />
               </View>
+            </View>
           </Fade>
 
           <Fade delay={200}>
@@ -95,6 +96,7 @@ export default function Login() {
                   <Text style={{ fontSize: 16, opacity: 0.6 }}>{showPw ? '👁️' : '👁️‍🗨️'}</Text>
                 </Pressable>
               </View>
+            </View>
           </Fade>
 
           <Fade delay={250}>

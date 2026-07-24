@@ -20,7 +20,17 @@ export declare const analyzeWaste: functions.HttpsFunction;
  * Pose une question à l'assistant IA RecyGo
  *
  * POST /askAssistant
+ * Headers:
+ *   Authorization: Bearer <token>
+ *   X-Firebase-AppCheck: <appCheckToken>
  * Body : { message: string, conversationHistory?: Array<{role, content}>, userId?: string }
+ *
+ * Sécurité :
+ * - Firebase Authentication (Bearer token)
+ * - Firebase App Check (header optionnel en dev)
+ * - Rate limiting (20 req/min par utilisateur)
+ * - Validation stricte des entrées
+ * - Protection XSS
  */
 export declare const askAssistant: functions.HttpsFunction;
 /**

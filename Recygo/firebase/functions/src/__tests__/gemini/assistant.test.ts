@@ -1,9 +1,15 @@
 /**
  * Tests unitaires pour le service d'assistant IA conversationnel
+ *
+ * La fonction askRecyclingAssistant accepte désormais :
+ *   (request: AskAssistantRequest, authToken?: string, appCheckToken?: string)
  */
 
+// Simuler l'émulateur Firebase pour les tests (contourne l'auth)
+process.env.FUNCTIONS_EMULATOR = 'true';
+
 import { askRecyclingAssistant } from '../../gemini/assistant';
-import * as client from '../../gemini/client';
+import { getGeminiModel, metrics } from '../../gemini/client';
 import { ErrorCodes } from '../../utils/errors';
 
 // Mock du client Gemini
@@ -12,12 +18,48 @@ jest.mock('../../gemini/client', () => ({
   metrics: { totalCalls: 0, totalTokens: 0, errors: 0, lastCallTime: 0 },
 }));
 
+// Mock Firestore (inliné dans jest.mock pour éviter les hoisting issues)
+jest.mock('../../firebase', () => {
+  const mockGet = jest.fn();
+  const mockAdd = jest.fn();
+  return {
+    getFirestore: jest.fn().mockReturnValue({
+      collection: jest.fn().mockReturnThis(),
+      doc: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      get: mockGet,
+      add: mockAdd,
+      batch: jest.fn().mockReturnValue({ commit: jest.fn() }),
+    }),
+    getAuth: jest.fn().mockReturnValue({
+      verifyIdToken: jest.fn().mockResolvedValue({
+        uid: 'test-user-123',
+        email: 'test@recygo.ci',
+      }),
+    }),
+    getFirebaseApp: jest.fn(),
+  };
+});
+
+jest.mock('firebase-admin', () => ({
+  firestore: {
+    Timestamp: {
+      now: () => ({ toMillis: () => Date.now(), seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 }),
+    },
+  },
+  appCheck: jest.fn().mockReturnValue({
+    verifyToken: jest.fn().mockResolvedValue({}),
+  }),
+}));
+
 describe('askRecyclingAssistant', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    client.metrics.totalCalls = 0;
-    client.metrics.totalTokens = 0;
-    client.metrics.errors = 0;
+    metrics.totalCalls = 0;
+    metrics.totalTokens = 0;
+    metrics.errors = 0;
   });
 
   it('devrait répondre à une question sur le recyclage', async () => {
@@ -29,7 +71,6 @@ describe('askRecyclingAssistant', () => {
       },
     });
 
-    // Mock du modèle pour détection hors-sujet
     const mockModel = {
       generateContent: jest.fn().mockResolvedValueOnce({
         response: { text: () => 'true' },
@@ -44,11 +85,10 @@ describe('askRecyclingAssistant', () => {
         }),
       }),
     };
-    (client.getGeminiModel as jest.Mock).mockReturnValue(mockModel);
+    (getGeminiModel as jest.Mock).mockReturnValue(mockModel);
 
     const result = await askRecyclingAssistant({
       message: 'Comment recycler le plastique ?',
-      userId: 'test-user',
     });
 
     expect(result.success).toBe(true);
@@ -58,16 +98,8 @@ describe('askRecyclingAssistant', () => {
   });
 
   it('devrait rejeter les messages hors-sujet', async () => {
-    const mockModel = {
-      generateContent: jest.fn().mockResolvedValue({
-        response: { text: () => 'false' },
-      }),
-      startChat: jest.fn(),
-    };
-    (client.getGeminiModel as jest.Mock).mockReturnValue(mockModel);
-
     const result = await askRecyclingAssistant({
-      message: 'Quel est le sens de la vie ?',
+      message: 'Quel est ton parti politique ?',
     });
 
     expect(result.success).toBe(true);
@@ -75,18 +107,14 @@ describe('askRecyclingAssistant', () => {
   });
 
   it('devrait retourner une erreur si le message est vide', async () => {
-    const result = await askRecyclingAssistant({
-      message: '',
-    });
+    const result = await askRecyclingAssistant({ message: '' });
 
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe(ErrorCodes.VALIDATION_ERROR);
   });
 
   it('devrait retourner une erreur si le message est trop long', async () => {
-    const result = await askRecyclingAssistant({
-      message: 'a'.repeat(2001),
-    });
+    const result = await askRecyclingAssistant({ message: 'a'.repeat(2001) });
 
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe(ErrorCodes.VALIDATION_ERROR);
@@ -111,7 +139,7 @@ describe('askRecyclingAssistant', () => {
         }),
       }),
     };
-    (client.getGeminiModel as jest.Mock).mockReturnValue(mockModel);
+    (getGeminiModel as jest.Mock).mockReturnValue(mockModel);
 
     const result = await askRecyclingAssistant({
       message: 'test',
@@ -123,14 +151,16 @@ describe('askRecyclingAssistant', () => {
 
   it('devrait gérer les erreurs Gemini', async () => {
     const mockModel = {
-      generateContent: jest.fn().mockRejectedValue(new Error('API Error')),
-      startChat: jest.fn(),
+      generateContent: jest.fn().mockResolvedValue({
+        response: { text: () => 'true' },
+      }),
+      startChat: jest.fn().mockReturnValue({
+        sendMessage: jest.fn().mockRejectedValue(new Error('Erreur inconnue')),
+      }),
     };
-    (client.getGeminiModel as jest.Mock).mockReturnValue(mockModel);
+    (getGeminiModel as jest.Mock).mockReturnValue(mockModel);
 
-    const result = await askRecyclingAssistant({
-      message: 'Comment recycler ?',
-    });
+    const result = await askRecyclingAssistant({ message: 'Comment recycler ?' });
 
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe(ErrorCodes.INTERNAL_ERROR);
@@ -156,11 +186,9 @@ describe('askRecyclingAssistant', () => {
         }),
       }),
     };
-    (client.getGeminiModel as jest.Mock).mockReturnValue(mockModel);
+    (getGeminiModel as jest.Mock).mockReturnValue(mockModel);
 
-    const result = await askRecyclingAssistant({
-      message: 'Comment trier ?',
-    });
+    const result = await askRecyclingAssistant({ message: 'Comment trier ?' });
 
     expect(result.success).toBe(true);
     expect(result.data?.reply).toBe('Voici comment trier vos déchets...');
@@ -181,14 +209,11 @@ describe('askRecyclingAssistant', () => {
         }),
       }),
     };
-    (client.getGeminiModel as jest.Mock).mockReturnValue(mockModel);
+    (getGeminiModel as jest.Mock).mockReturnValue(mockModel);
 
-    const result = await askRecyclingAssistant({
-      message: 'test',
-    });
+    const result = await askRecyclingAssistant({ message: 'test' });
 
     expect(result.success).toBe(true);
     expect(result.data?.reply).toBe('Réponse texte brut simple');
   });
 });
-

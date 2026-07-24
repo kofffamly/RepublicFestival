@@ -22,7 +22,7 @@ export interface GeminiConfig {
 }
 
 export interface AppConfig {
-  env: 'development' | 'production';
+  env: 'development' | 'production' | 'test';
   locale: string;
   timezone: string;
   maxImageSizeMB: number;
@@ -65,7 +65,7 @@ export const appConfig: AppConfig = {
   cleanupDaysThreshold: getEnvInt('CLEANUP_DAYS_THRESHOLD', 90),
 };
 
-export const isDev = (): boolean => appConfig.env === 'development';
+export const isDev = (): boolean => appConfig.env === 'development' || appConfig.env === 'test';
 export const isProd = (): boolean => appConfig.env === 'production';
 
 export const firebaseConfig: FirebaseConfig = {

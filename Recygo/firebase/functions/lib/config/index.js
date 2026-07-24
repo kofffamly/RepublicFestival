@@ -45,7 +45,7 @@ exports.appConfig = {
     maxImageSizeMB: getEnvInt('MAX_IMAGE_SIZE_MB', 10),
     cleanupDaysThreshold: getEnvInt('CLEANUP_DAYS_THRESHOLD', 90),
 };
-const isDev = () => exports.appConfig.env === 'development';
+const isDev = () => exports.appConfig.env === 'development' || exports.appConfig.env === 'test';
 exports.isDev = isDev;
 const isProd = () => exports.appConfig.env === 'production';
 exports.isProd = isProd;

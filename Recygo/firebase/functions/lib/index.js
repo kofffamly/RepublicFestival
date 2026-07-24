@@ -107,7 +107,17 @@ exports.analyzeWaste = functions
  * Pose une question à l'assistant IA RecyGo
  *
  * POST /askAssistant
+ * Headers:
+ *   Authorization: Bearer <token>
+ *   X-Firebase-AppCheck: <appCheckToken>
  * Body : { message: string, conversationHistory?: Array<{role, content}>, userId?: string }
+ *
+ * Sécurité :
+ * - Firebase Authentication (Bearer token)
+ * - Firebase App Check (header optionnel en dev)
+ * - Rate limiting (20 req/min par utilisateur)
+ * - Validation stricte des entrées
+ * - Protection XSS
  */
 exports.askAssistant = functions
     .runWith({
@@ -116,20 +126,44 @@ exports.askAssistant = functions
     secrets: ['GEMINI_API_KEY'],
 })
     .https.onRequest(async (req, res) => {
+    // CORS
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Firebase-AppCheck');
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
+    }
     if (req.method !== 'POST') {
         res.status(405).json({ success: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Méthode non autorisée. Utilisez POST.' } });
         return;
     }
     try {
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-        if (req.method === 'OPTIONS') {
-            res.status(204).send('');
-            return;
-        }
+        // Extraire les tokens des headers
+        const authHeader = req.headers.authorization;
+        const appCheckHeader = req.headers['x-firebase-appcheck'];
         const validatedRequest = (0, validators_1.validateAssistantRequest)(req.body || {});
-        const result = await (0, assistant_1.askRecyclingAssistant)(validatedRequest);
+        // Passer les tokens de sécurité à la fonction d'assistant
+        // Le token Bearer et AppCheck sont extraits dans askRecyclingAssistant
+        const authToken = authHeader?.startsWith('Bearer ') ? authHeader : undefined;
+        const result = await (0, assistant_1.askRecyclingAssistant)(validatedRequest, authToken, appCheckHeader);
+        // Gérer les codes HTTP spécifiques
+        if (!result.success && result.error) {
+            switch (result.error.code) {
+                case 'UNAUTHORIZED':
+                    res.status(401).json(result);
+                    return;
+                case 'RATE_LIMITED':
+                    res.status(429).json(result);
+                    return;
+                case 'VALIDATION_ERROR':
+                    res.status(400).json(result);
+                    return;
+                default:
+                    res.status(500).json(result);
+                    return;
+            }
+        }
         res.json(result);
     }
     catch (error) {

@@ -18,7 +18,7 @@ export interface GeminiConfig {
     topK: number;
 }
 export interface AppConfig {
-    env: 'development' | 'production';
+    env: 'development' | 'production' | 'test';
     locale: string;
     timezone: string;
     maxImageSizeMB: number;
