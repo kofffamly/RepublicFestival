@@ -5,11 +5,16 @@
  * pour utilisation côté client (Expo / React Native)
  */
 
+// Polyfills requis pour utiliser Firebase JS SDK dans React Native / Expo
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
+
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAuth, connectAuthEmulator, Auth } from 'firebase/auth';
 import { getStorage, FirebaseStorage, connectStorageEmulator } from 'firebase/storage';
 import FIREBASE_CONFIG from '@/config/firebase';
+import Constants from 'expo-constants';
 
 // ═════════════════════════════════════════════════════════════════════
 // INITIALISATION
@@ -46,7 +51,8 @@ if (!getApps().length) {
 // MODE ÉMULATEUR (développement)
 // ═════════════════════════════════════════════════════════════════════
 
-const USE_EMULATOR = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+const runtimeEnv = { ...Constants.expoConfig?.extra, ...process.env };
+const USE_EMULATOR = runtimeEnv.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
 
 if (USE_EMULATOR) {
   // Connect Auth emulator

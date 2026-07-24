@@ -14,7 +14,9 @@ import * as authShim from '@/firebase/authShim';
 import * as fsShim from '@/firebase/firestoreShim';
 import { auth, db } from '../firebase';
 
-const DEMO_MODE = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+import Constants from 'expo-constants';
+const runtimeEnv = { ...Constants.expoConfig?.extra, ...process.env };
+const DEMO_MODE = runtimeEnv.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && runtimeEnv.EXPO_PUBLIC_DEMO_MODE === 'true';
 
 // @ts-ignore
 const { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, onAuthStateChanged } = DEMO_MODE ? authShim as any : authSDK as any;

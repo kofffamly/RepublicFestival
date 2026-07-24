@@ -18,8 +18,10 @@ import * as authShim from '@/firebase/authShim';
 import * as fsShim from '@/firebase/firestoreShim';
 import { auth, db } from '@/firebase';
 
+import Constants from 'expo-constants';
 // Demo mode flag: use shims when emulator mode is enabled and demo fallback requested
-const DEMO_MODE = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+const runtimeEnv = { ...Constants.expoConfig?.extra, ...process.env };
+const DEMO_MODE = runtimeEnv.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && runtimeEnv.EXPO_PUBLIC_DEMO_MODE === 'true';
 
 // Pick implementations (shims or real SDK)
 // @ts-ignore - selected bindings may differ between shim and SDK

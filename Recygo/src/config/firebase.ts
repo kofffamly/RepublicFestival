@@ -63,7 +63,7 @@ if (missingKeys.length > 0 && !USE_FIREBASE_EMULATOR) {
 
   // Throw a clear error instead of the cryptic "auth/invalid-api-key"
   throw new Error(message);
-} else if (missingKeys.length > 0 && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+} else if (missingKeys.length > 0 && runtimeEnv.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
   // When using the emulator, log a clear warning and continue with placeholders.
   // This keeps the app running for demos and local development.
   // eslint-disable-next-line no-console
