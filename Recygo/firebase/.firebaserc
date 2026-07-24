@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "default": "recygo-ci-dev",
+    "dev": "recygo-ci-dev",
+    "prod": "recygo-ci-prod"
+  },
+  "targets": {},
+  "etags": {}
+}

@@ -1,0 +1,260 @@
+// ─── Firestore Security Rules — RecyGo CI ─────────────────────────────
+// Rôles : citizen | collector | admin
+// Claims stockés dans request.auth.token.role
+
+rules_version = '2';
+
+// ═════════════════════════════════════════════════════════════════════
+// FONCTIONS UTILITAIRES
+// ═════════════════════════════════════════════════════════════════════
+
+function isAuthenticated() {
+  return request.auth != null && request.auth.uid != null;
+}
+
+function isOwner(userId) {
+  return isAuthenticated() && request.auth.uid == userId;
+}
+
+function hasRole(role) {
+  return isAuthenticated() && request.auth.token.role == role;
+}
+
+function isAdmin() {
+  return hasRole('admin');
+}
+
+function isCollector() {
+  return hasRole('collector');
+}
+
+function isCitizen() {
+  return hasRole('citizen');
+}
+
+function isCitizenOrCollector() {
+  return isCitizen() || isCollector();
+}
+
+function isValidTimestamp() {
+  return request.resource.data.updatedAt == request.time
+      && request.resource.data.createdAt == resource.data.createdAt;
+}
+
+function isNotEmptyString(value) {
+  return value is string && value.size() > 0;
+}
+
+function isPositiveNumber(value) {
+  return value is number && value >= 0;
+}
+
+function isLatLng(lat, lng) {
+  return lat is number && lng is number
+      && lat >= -90 && lat <= 90
+      && lng >= -180 && lng <= 180;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : users
+// ═════════════════════════════════════════════════════════════════════
+match /users/{userId} {
+  allow read: if isOwner(userId) || isAdmin();
+  allow create: if isOwner(userId)
+      && request.resource.data.keys().hasAll(['email', 'role', 'createdAt'])
+      && request.resource.data.role in ['citizen', 'collector']
+      && isNotEmptyString(request.resource.data.email)
+      && request.resource.data.createdAt == request.time;
+  allow update: if isOwner(userId)
+      && request.resource.data.keys().hasOnly([
+        'displayName', 'phone', 'photoURL', 'address',
+        'notificationToken', 'updatedAt', 'preferences'
+      ])
+      && request.resource.data.updatedAt == request.time;
+  allow delete: if isOwner(userId) || isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : profiles
+// ═════════════════════════════════════════════════════════════════════
+match /profiles/{profileId} {
+  allow read: if isAuthenticated();
+  allow create: if isOwner(profileId)
+      && request.resource.data.keys().hasAll(['userId', 'role', 'createdAt'])
+      && request.resource.data.userId == profileId;
+  allow update: if isOwner(profileId)
+      && request.resource.data.keys().hasAny(['bio', 'avatarUrl', 'address',
+        'phone', 'preferences', 'updatedAt']);
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : wasteReports
+// ═════════════════════════════════════════════════════════════════════
+match /wasteReports/{reportId} {
+  allow read: if isAuthenticated()
+      && (resource.data.userId == request.auth.uid
+          || isCollector()
+          || isAdmin());
+  allow create: if isCitizen()
+      && request.resource.data.keys().hasAll([
+        'userId', 'wasteType', 'category', 'estimatedWeight',
+        'photoUrl', 'location', 'status', 'createdAt'
+      ])
+      && request.resource.data.userId == request.auth.uid
+      && request.resource.data.status == 'pending';
+  allow update: if (isOwner(resource.data.userId)
+          && request.resource.data.keys().hasOnly(['status', 'updatedAt']))
+      || (isCollector()
+          && request.resource.data.keys().hasOnly([
+            'collectorId', 'status', 'collectedAt', 'actualWeight',
+            'reward', 'updatedAt'
+          ]))
+      || isAdmin();
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : recyclingCenters
+// ═════════════════════════════════════════════════════════════════════
+match /recyclingCenters/{centerId} {
+  allow read: if isAuthenticated();
+  allow create: if isAdmin()
+      && request.resource.data.keys().hasAll([
+        'name', 'address', 'location', 'acceptedWasteTypes',
+        'openingHours', 'contact', 'createdAt'
+      ]);
+  allow update: if isAdmin()
+      && request.resource.data.keys().hasAny([
+        'name', 'address', 'location', 'acceptedWasteTypes',
+        'openingHours', 'contact', 'rating', 'updatedAt'
+      ]);
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : collectorRequests
+// ═════════════════════════════════════════════════════════════════════
+match /collectorRequests/{requestId} {
+  allow read: if isAuthenticated()
+      && (resource.data.citizenId == request.auth.uid
+          || resource.data.collectorId == request.auth.uid
+          || isAdmin());
+  allow create: if isCitizen()
+      && request.resource.data.keys().hasAll([
+        'citizenId', 'wasteReportId', 'status', 'createdAt'
+      ])
+      && request.resource.data.citizenId == request.auth.uid
+      && request.resource.data.status == 'pending';
+  allow update: if (isCollector()
+          && request.resource.data.keys().hasOnly([
+            'collectorId', 'status', 'scheduledAt', 'updatedAt'
+          ]))
+      || (isCitizen()
+          && request.resource.data.keys().hasOnly([
+            'status', 'cancelReason', 'updatedAt'
+          ]))
+      || isAdmin();
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : notifications
+// ═════════════════════════════════════════════════════════════════════
+match /notifications/{notificationId} {
+  allow read: if isAuthenticated()
+      && resource.data.userId == request.auth.uid;
+  allow create: if isAdmin()
+      || (isAuthenticated()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.keys().hasAll([
+            'userId', 'type', 'title', 'body', 'createdAt'
+          ]));
+  allow update: if isOwner(resource.data.userId)
+      && request.resource.data.keys().hasOnly(['read', 'readAt']);
+  allow delete: if isOwner(resource.data.userId)
+      || isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : conversations
+// ═════════════════════════════════════════════════════════════════════
+match /conversations/{conversationId} {
+  allow read: if isAuthenticated()
+      && (resource.data.participants.hasAny([request.auth.uid])
+          || isAdmin());
+  allow create: if isAuthenticated()
+      && request.resource.data.keys().hasAll([
+        'participants', 'lastMessage', 'updatedAt'
+      ])
+      && request.resource.data.participants.size() >= 2
+      && request.resource.data.participants.hasAny([request.auth.uid]);
+  allow update: if isAuthenticated()
+      && resource.data.participants.hasAny([request.auth.uid])
+      && request.resource.data.keys().hasOnly([
+        'lastMessage', 'lastSenderId', 'updatedAt', 'unreadCount'
+      ]);
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : messages
+// ═════════════════════════════════════════════════════════════════════
+match /messages/{messageId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated()
+      && request.resource.data.keys().hasAll([
+        'conversationId', 'senderId', 'text', 'createdAt'
+      ])
+      && request.resource.data.senderId == request.auth.uid;
+  allow delete: if isOwner(resource.data.senderId) || isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : transactions
+// ═════════════════════════════════════════════════════════════════════
+match /transactions/{transactionId} {
+  allow read: if isAuthenticated()
+      && (resource.data.userId == request.auth.uid
+          || resource.data.collectorId == request.auth.uid
+          || isAdmin());
+  allow create: if isAuthenticated()
+      && request.resource.data.keys().hasAll([
+        'userId', 'type', 'amount', 'status', 'createdAt'
+      ])
+      && request.resource.data.userId == request.auth.uid;
+  allow update: if isAdmin()
+      && request.resource.data.keys().hasOnly([
+        'status', 'processedAt', 'updatedAt'
+      ]);
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : rewards
+// ═════════════════════════════════════════════════════════════════════
+match /rewards/{rewardId} {
+  allow read: if isAuthenticated()
+      && (resource.data.userId == request.auth.uid || isAdmin());
+  allow create: if isAuthenticated()
+      && request.resource.data.userId == request.auth.uid;
+  allow update: if isAdmin();
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : statistics
+// ═════════════════════════════════════════════════════════════════════
+match /statistics/{statId} {
+  allow read: if isAuthenticated();
+  allow write: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// COLLECTION : auditLogs (admin only)
+// ═════════════════════════════════════════════════════════════════════
+match /auditLogs/{logId} {
+  allow read: if isAdmin();
+  allow create: if isAuthenticated();
+  allow delete: if isAdmin();
+}

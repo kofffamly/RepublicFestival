@@ -1,0 +1,91 @@
+// ─── Firebase Storage Rules — RecyGo CI ──────────────────────────────
+// Rôles : citizen | collector | admin
+
+rules_version = '2';
+
+// ═════════════════════════════════════════════════════════════════════
+// FONCTIONS UTILITAIRES
+// ═════════════════════════════════════════════════════════════════════
+
+function isAuthenticated() {
+  return request.auth != null;
+}
+
+function isAdmin() {
+  return isAuthenticated() && request.auth.token.role == 'admin';
+}
+
+function isOwner(userId) {
+  return isAuthenticated() && request.auth.uid == userId;
+}
+
+// Extensions autorisées (images uniquement)
+function isAllowedImage() {
+  return request.resource.contentType.matches('image/.*')
+      && request.resource.contentType.matches('image/jpeg|image/png|image/webp');
+}
+
+// Taille max : 10 MB
+function isAllowedSize() {
+  return request.resource.size < 10 * 1024 * 1024;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// CHEMIN : photos de déchets (wasteReports)
+// /waste/{userId}/{reportId}.{ext}
+// ═════════════════════════════════════════════════════════════════════
+match /waste/{userId}/{fileName} {
+  allow read: if isAuthenticated();
+  allow create: if isOwner(userId)
+      && isAllowedImage()
+      && isAllowedSize();
+  allow update: if isOwner(userId);
+  allow delete: if isOwner(userId) || isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// CHEMIN : avatars utilisateurs
+// /avatars/{userId}.{ext}
+// ═════════════════════════════════════════════════════════════════════
+match /avatars/{userId}/{fileName} {
+  allow read: if isAuthenticated();
+  allow create: if isOwner(userId)
+      && isAllowedImage()
+      && isAllowedSize();
+  allow delete: if isOwner(userId) || isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// CHEMIN : photos de centres de recyclage
+// /recyclingCenters/{centerId}.{ext}
+// ═════════════════════════════════════════════════════════════════════
+match /recyclingCenters/{centerId}/{fileName} {
+  allow read: if isAuthenticated();
+  allow create: if isAdmin()
+      && isAllowedImage()
+      && isAllowedSize();
+  allow delete: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// CHEMIN : documents administratifs (admin only)
+// /documents/{docId}.{ext}
+// ═════════════════════════════════════════════════════════════════════
+match /documents/{fileName} {
+  allow read: if isAuthenticated();
+  allow write: if isAdmin();
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// CHEMIN : uploads temporaires (pour analyse IA)
+// /temp/{userId}/{fileName}
+// ═════════════════════════════════════════════════════════════════════
+match /temp/{userId}/{fileName} {
+  allow read: if isOwner(userId) || isAdmin();
+  allow create: if isOwner(userId)
+      && isAllowedImage()
+      && isAllowedSize();
+  allow delete: if isOwner(userId) || isAdmin();
+
+  // Auto-delete après 24h (TTL géré par Cloud Function)
+}
