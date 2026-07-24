@@ -281,7 +281,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const m = err instanceof Error ? err.message : 'Erreur';
       if (m.includes('email-already-in-use')) setError('Email déjà utilisé');
       else if (m.includes('weak-password')) setError('Mot de passe trop faible (min 6 car.)');
-      else setError(m);
+      else if (m.includes('configuration-not-found')) {
+        setError('Firebase Auth configuration introuvable. Vérifiez vos variables d’environnement et les identifiants du projet.');
+      } else setError(m);
       throw err;
     }
   }, []);

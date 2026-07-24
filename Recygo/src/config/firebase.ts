@@ -18,6 +18,8 @@ const REQUIRED_KEYS = [
 ] as const;
 
 // ─── Validation au chargement ───────────────────────────────────────
+import type { FirebaseOptions } from 'firebase/app';
+
 const missingKeys = REQUIRED_KEYS.filter((key) => !process.env[key]);
 
 // If running with the local Firebase emulator, allow missing production keys
@@ -62,13 +64,16 @@ if (missingKeys.length > 0 && !USE_FIREBASE_EMULATOR) {
 }
 
 // ─── Configuration ──────────────────────────────────────────────────
-const FIREBASE_CONFIG = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+const FIREBASE_CONFIG: FirebaseOptions = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
+  storageBucket:
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    `${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.appspot.com`,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 export default FIREBASE_CONFIG;
