@@ -144,9 +144,9 @@ function FormField({
 export default function Register() {
   const router = useRouter();
   const { role: roleParam } = useLocalSearchParams<{ role?: string }>();
-  const { register } = useApp();
+  const { register, error: authError } = useApp();
   const insets = useSafeAreaInsets();
-
+ 
   // États des champs
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -197,8 +197,16 @@ export default function Register() {
 
       router.replace('/(tabs)/home');
     } catch (e: unknown) {
-      // L'erreur est déjà gérée dans le contexte (setError)
-      // Récupère le message d'erreur du contexte
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('email-already-in-use')) {
+        setError('Email déjà utilisé');
+      } else if (message.includes('weak-password')) {
+        setError('Mot de passe trop faible (min 6 caractères)');
+      } else if (authError) {
+        setError(authError);
+      } else {
+        setError('Impossible de créer le compte pour le moment.');
+      }
     } finally {
       setIsLoading(false);
     }

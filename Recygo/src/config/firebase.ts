@@ -23,7 +23,17 @@ const missingKeys = REQUIRED_KEYS.filter((key) => !process.env[key]);
 // If running with the local Firebase emulator, allow missing production keys
 // so the app can run for local demos. Production builds should still provide
 // the real keys — this guard only activates when EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true'.
-if (missingKeys.length > 0 && process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR !== 'true') {
+const USE_FIREBASE_EMULATOR = process.env.EXPO_PUBLIC_USE_FIREBASE_EMULATOR === 'true';
+const USE_DEMO_MODE = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+
+if (USE_DEMO_MODE && !USE_FIREBASE_EMULATOR) {
+  throw new Error(
+    'EXPO_PUBLIC_DEMO_MODE=true requires EXPO_PUBLIC_USE_FIREBASE_EMULATOR=true. ' +
+    'Disable demo mode to connect to the real Firebase project.'
+  );
+}
+
+if (missingKeys.length > 0 && !USE_FIREBASE_EMULATOR) {
   const message = [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '❌  Configuration Firebase invalide — variables manquantes',
