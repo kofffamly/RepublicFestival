@@ -11,5 +11,14 @@
 - [x] 7. Vérifier la compilation TypeScript (en cours)
 - [x] 8. Nettoyer les fichiers tests préexistants
 
-✅ **Assistant IA RecyGo CI** — Implémentation terminée !
+## Corrections effectuées (Juillet 2026)
+
+- [x] **Expo start** — Résolu le `ConfigError: package.json not found` en lançant depuis `Recygo/`
+- [x] **Errors TS dans assistant.test.ts** — Résolu 57 erreurs TypeScript :
+  - `tsconfig.test.json` : Ajout `"exclude": ["node_modules", "lib"]` pour override l'exclusion de `src/__tests__`
+  - `src/__tests__/tsconfig.json` : Nouveau fichier pour que VSCode détecte le bon tsconfig pour les tests
+  - `.vscode/settings.json` : Config js/ts.* non-dépréciées
+- [x] **Tests Jest** : 41/41 passés ✓
+
+✅ **Assistant IA RecyGo CI** — Implémentation terminée et fonctionnelle !
 
